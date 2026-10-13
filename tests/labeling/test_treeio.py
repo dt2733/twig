@@ -320,6 +320,24 @@ class TestStripAndHelpers:
         assert treeio.has_dists(new) is False
 
 
+class TestExampleData:
+    """The example species trees of the design are shared by the tests and the documentation."""
+
+    def test_species_tree_file(self, data_dir):
+        assert (data_dir / "species.nwk").read_text().strip() == SPECIES
+        assert treeio.species_names(data_dir / "species.nwk") == ["O", "M1", "A", "B", "C", "M2", "D", "E"]
+
+    def test_labeled_species_tree_file_round_trips(self, data_dir):
+        from twig.labeling.core.newick import to_newick
+        path = data_dir / "species.labeled.nwk"
+        assert path.read_text().strip() == LABELED
+        tree = treeio.read_tree(path)
+        assert to_newick(tree, dists=treeio.has_dists(tree)) == LABELED
+
+    def test_names_data_species_tree(self, names_dir):
+        assert len(treeio.species_names(names_dir / "species.nwk")) == 5
+
+
 class TestSpeciesTrees:
     def test_species_names_without_toytree(self):
         assert treeio.species_names(LABELED) == ["O", "M1", "A", "B", "C", "M2", "D", "E"]
