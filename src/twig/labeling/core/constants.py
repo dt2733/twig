@@ -55,3 +55,20 @@ STATUS_NAMES = (
 
 # syntaxes recognized when reading labels from a tree string
 LABEL_SYNTAXES = ("auto", "braces", "paml", "nhx", "none")
+
+# rules that turn selected tips into labeled branches, and HyPhy's names for them
+RULE_NAMES = ("tips", "all", "crown", "some", "fitch", "clade", "stem")
+RULE_ALIASES = ("None", "All descendants", "All descendants, no MRCA", "Some descendants", "Parsimony")
+
+# choices of the label commands
+SELECT_ON_CHOICES = ("name", "species")
+LEAF_NODE_CHOICES = ("label", "skip")
+PRECEDENCE_CHOICES = ("specific", "first", "last", "error")
+EXISTING_CHOICES = ("keep", "clear")
+ROOT_STATE_CHOICES = ("free", "0", "1")
+DEFAULT_NUISANCE_LABEL = "Nuisance"
+
+# output formats of trees with labels, and what to do with the two branches at the root
+FORMAT_NAMES = ("braces", "hyphy", "newick", "table")
+INTERNAL_NAME_CHOICES = ("none", "auto", "support", "keep")
+ROOT_EDGE_POLICIES = ("unlabel", "labeled", "outgroup", "ingroup", "error")

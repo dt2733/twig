@@ -27,6 +27,7 @@ import re
 import sys
 from collections import Counter
 from collections.abc import Iterator, Mapping
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -76,6 +77,47 @@ def toytree_errors() -> tuple[type[Exception], ...]:
     import_toytree()
     from toytree.utils import NodeDataError, ToytreeError, ToytreeRegexError
     return (ToytreeError, NodeDataError, ToytreeRegexError)
+
+
+# toytree copies and reroots trees with copy.deepcopy, which uses 6 Python frames for each level of a
+# tree, so a tree more than about 140 levels deep exceeds the default limit of 1000 frames
+FRAMES_PER_LEVEL = 8
+# deeper trees are refused, as the C stack of Python 3.10 cannot take many more frames
+MAX_RECURSION = 25_000
+
+
+def tree_depth(tree: "ToyTree") -> int:
+    """Return the number of branches on the longest path from the root to a tip."""
+    depth = {tree.treenode.idx: 0}
+    for node in reversed(list(tree)):         # idx order puts children first, so this puts parents first
+        if node.up is not None:
+            depth[node.idx] = depth[node.up.idx] + 1
+    return max(depth.values())
+
+
+@contextmanager
+def deep_recursion(tree: "ToyTree"):
+    """Raise Python's recursion limit while toytree copies or reroots a deep tree.
+
+    The limit is put back afterwards. A tree that is too deep for even the raised
+    limit is an error, and not a crash.
+    """
+    depth = tree_depth(tree)
+    frame, in_use = sys._getframe(), 0
+    while frame is not None:
+        in_use, frame = in_use + 1, frame.f_back
+    needed = FRAMES_PER_LEVEL * depth + in_use + 100
+    limit = sys.getrecursionlimit()
+    if needed <= limit:
+        yield
+        return
+    if needed > MAX_RECURSION:
+        raise TwigError(f"the tree is {depth} levels deep, which is too deep to copy safely")
+    sys.setrecursionlimit(needed)
+    try:
+        yield
+    finally:
+        sys.setrecursionlimit(limit)
 
 
 ###########################################################################
@@ -561,13 +603,44 @@ def carry_over_dists(old: "ToyTree", new: "ToyTree") -> "ToyTree":
     return new
 
 
+def copy_tree(tree: "ToyTree") -> "ToyTree":
+    """Return a copy of a tree, which may be deep."""
+    with deep_recursion(tree):
+        return tree.copy()
+
+
 def strip_labels(tree: "ToyTree", inplace: bool = False) -> "ToyTree":
     """Return a tree in which every branch is unlabeled."""
-    out = tree if inplace else tree.copy()
+    out = tree if inplace else copy_tree(tree)
     for node in out:
         node.label = None
     out.edge_features.add(LABEL)
     return out
+
+
+def set_labels(tree: "ToyTree", labels, inplace: bool = False) -> "ToyTree":
+    """Return a tree whose branches have the labels given as {idx: label}.
+
+    Branches that are not in the mapping, and the root, become unlabeled.
+    """
+    out = tree if inplace else copy_tree(tree)
+    for node in out:
+        node.label = None if node.up is None else (labels.get(node.idx) or None)
+    out.edge_features.add(LABEL)
+    return out
+
+
+def ensure_labels(tree: "ToyTree") -> "ToyTree":
+    """Make sure every node has a `label` feature, as nodes added by toytree do not.
+
+    Rerooting creates a new root node without the feature, so this is called
+    after operations that make new nodes.
+    """
+    for node in tree:
+        if not hasattr(node, LABEL):
+            node.label = None
+    tree.edge_features.add(LABEL)
+    return tree
 
 
 def labeled_branches(tree: "ToyTree") -> dict[int, str]:

@@ -367,3 +367,61 @@ class TestSpeciesTrees:
         tree = treeio.read_tree("((A,B)X,(C,D)X);")
         with pytest.raises(TwigError, match="not unique"):
             treeio.branch_ids(tree)
+
+
+def ladder(n):
+    """Return a Newick string for a tree that is n levels deep."""
+    text = "T0:1"
+    for i in range(1, n):
+        text = f"({text},T{i}:1):1"
+    return text.rsplit(":", 1)[0] + ";"
+
+
+class TestDeepTrees:
+    """toytree copies and reroots trees with deepcopy, which fails on trees more than about 140 levels deep."""
+
+    def test_depth_is_the_number_of_branches_on_the_longest_path(self):
+        assert treeio.tree_depth(treeio.read_tree("A;")) == 0
+        assert treeio.tree_depth(treeio.read_tree("(A,B);")) == 1
+        assert treeio.tree_depth(treeio.read_tree(SPECIES)) == 5
+        assert treeio.tree_depth(treeio.read_tree(ladder(50))) == 49
+
+    def test_copying_a_deep_tree_works_and_the_limit_is_restored(self):
+        import sys
+        tree = treeio.read_tree(ladder(400))
+        before = sys.getrecursionlimit()
+        with pytest.raises(RecursionError):
+            tree.copy()
+        assert sys.getrecursionlimit() == before
+        copy = treeio.copy_tree(tree)
+        assert [n.name for n in copy] == [n.name for n in tree]
+        assert sys.getrecursionlimit() == before
+
+    def test_the_limit_is_restored_after_an_error_inside_the_block(self):
+        import sys
+        tree = treeio.read_tree(ladder(400))
+        before = sys.getrecursionlimit()
+        with pytest.raises(ValueError):
+            with treeio.deep_recursion(tree):
+                assert sys.getrecursionlimit() > before
+                raise ValueError("inside")
+        assert sys.getrecursionlimit() == before
+
+    def test_labels_can_be_set_on_a_deep_tree(self):
+        tree = treeio.read_tree(ladder(400))
+        labeled = treeio.set_labels(tree, {0: "Test"})
+        assert [n.label for n in labeled if n.label] == ["Test"] and not any(n.label for n in tree)
+        assert not any(n.label for n in treeio.strip_labels(labeled))
+
+    def test_a_tree_that_is_too_deep_is_an_error_and_not_a_crash(self, monkeypatch):
+        monkeypatch.setattr(treeio, "MAX_RECURSION", 2000)
+        tree = treeio.read_tree(ladder(400))
+        with pytest.raises(TwigError, match="400 levels deep|399 levels deep"):
+            treeio.copy_tree(tree)
+
+    def test_shallow_trees_do_not_change_the_limit(self):
+        import sys
+        tree = treeio.read_tree(SPECIES)
+        before = sys.getrecursionlimit()
+        with treeio.deep_recursion(tree):
+            assert sys.getrecursionlimit() == before
