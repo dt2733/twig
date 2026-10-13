@@ -134,7 +134,8 @@ class TestCommandLine:
         out = capsys.readouterr().out
         for name in COMMANDS:
             assert name in out
-        assert "(planned for M1)" in out and "resolve tip and sequence names" in out
+        assert "(planned for M2)" in out and "resolve tip and sequence names" in out
+        assert "label the branches of a tree from selections of tips" in out
 
     @pytest.mark.parametrize("name", COMMANDS)
     def test_each_command_has_help(self, name, capsys):
@@ -144,7 +145,7 @@ class TestCommandLine:
         assert info.value.code == 0
         assert name in capsys.readouterr().out
 
-    @pytest.mark.parametrize("name, milestone", [("tree-label", "M1"), ("tree-label-transfer", "M2"), ("sample-reduce", "M4")])
+    @pytest.mark.parametrize("name, milestone", [("tree-label-transfer", "M2"), ("sample-reduce", "M4")])
     def test_planned_commands_say_so_and_fail_cleanly(self, run_twig, name, milestone):
         code, out, err = run_twig(name)
         assert code == 1 and out == ""

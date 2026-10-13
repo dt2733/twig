@@ -1,15 +1,263 @@
 #!/usr/bin/env python
 
-"""Run the tree-label subcommand, which is planned for milestone M1.
+"""Label the branches of trees from selections of tips.
 
-The command is registered so that it appears in `twig -h`, but it is not
-available yet. See docs/labeling/design.md for the design.
+Tips are selected by name or species, a rule turns each selection into labeled
+branches, and the trees are written in one of several formats. The usual use is
+to label the species tree once, and the labeled tree is then the input of
+`tree-label-transfer`.
+
+>>> twig tree-label -i sp.nwk -L Test dioecious.txt --rule fitch --stems unlabel --background Reference --show
+>>> twig tree-label -i sp.nwk -L Test dioecious.txt --rule fitch --nuisance C --background Reference
+>>> twig tree-label -i gene.nwk -L Test '^Amaranthus_hybridus' -F hyphy -o gene.hyphy.nwk
 """
 
+from __future__ import annotations
+
+import sys
+from collections import Counter
+from contextlib import contextmanager
+from dataclasses import replace
+from pathlib import Path
+
+from loguru import logger
+
 from twig.utils import TwigError, set_log_level
+from twig.labeling.core import batch, display, rooting, treeio, writers
+from twig.labeling.core.constants import EXISTING_CHOICES, LEAF_NODE_CHOICES, PRECEDENCE_CHOICES, SELECT_ON_CHOICES
+from twig.labeling.core.labelsets import (
+    LabelingConfig,
+    LabelingResult,
+    LabelSet,
+    apply_label_sets,
+    check_settings,
+    nuisance_set,
+    parse_label_args,
+    read_spec,
+)
+from twig.labeling.core.names import NameMapper
+from twig.labeling.core.parsimony import to_fraction
+from twig.labeling.core.rules import resolve_rule
+from twig.labeling.core.sanitize import NameTable
+from twig.labeling.core.validate import errors, warnings
+
+
+def _count(n: int, noun: str) -> str:
+    """Return a count with its noun, such as '1 branch' or '2 branches'."""
+    return f"{n} {noun}" if n == 1 else f"{n} {noun}es" if noun.endswith("ch") else f"{n} {noun}s"
+
+
+@contextmanager
+def at_tree(locus: str):
+    """Add the name of the tree to the message of a TwigError raised inside the block."""
+    try:
+        yield
+    except TwigError as exc:
+        raise TwigError(f"{locus}: {exc}") from None
+
+
+def read_paml_codes(items: list[str] | None) -> dict[str, str] | None:
+    """Return the names of PAML label numbers from entries such as 1=Test."""
+    codes = {}
+    for item in items or ():
+        number, equals, name = item.partition("=")
+        if not equals or not number.strip() or not name.strip():
+            raise TwigError(f"--paml-codes expects entries such as 1=Test, got {item!r}")
+        codes[number.strip()] = name.strip()
+    return codes or None
+
+
+def build_label_sets(args) -> list[LabelSet]:
+    """Return the label sets from a spec file, from -L, and from --nuisance, in that order."""
+    default_rule = resolve_rule(args.rule)
+    sets: list[LabelSet] = []
+    if args.spec:
+        sets += read_spec(args.spec, default_rule)
+    if args.label:
+        sets += parse_label_args(args.label, default_rule)
+    if args.nuisance:
+        sets.append(nuisance_set(args.nuisance, args.nuisance_label))
+    return sets
+
+
+def build_config(args) -> LabelingConfig:
+    """Return the settings that apply to all label sets from the parsed arguments."""
+    for name, value, choices in (
+        ("--select-on", args.select_on, SELECT_ON_CHOICES),
+        ("--leaf-nodes", args.leaf_nodes, LEAF_NODE_CHOICES),
+        ("--precedence", args.precedence, PRECEDENCE_CHOICES),
+        ("--existing", args.existing, EXISTING_CHOICES),
+    ):
+        if value not in choices:
+            raise TwigError(f"unknown value {value!r} for {name}, choose from {list(choices)}")
+    return LabelingConfig(
+        select_on=args.select_on,
+        exact=args.exact,
+        invert=args.invert,
+        leaf_nodes=args.leaf_nodes,
+        stems=args.stems,
+        losses=args.losses,
+        background=args.background,
+        precedence=args.precedence,
+        existing=args.existing,
+        unknown=tuple(args.unknown or ()),
+        ambiguous=args.ambiguous,
+        gain_cost=to_fraction(args.gain_cost),
+        loss_cost=to_fraction(args.loss_cost),
+        root_state=args.root_state,
+    )
+
+
+def check_outputs(args) -> None:
+    """Raise a TwigError if an output exists, is listed twice, or is the input."""
+    paths = [p for p in (args.out, args.branch_table, args.names_table) if p]
+    for path in paths:
+        batch.check_writable(path, args.force)
+    resolved = [Path(p).resolve() for p in paths]
+    if len(set(resolved)) != len(resolved):
+        raise TwigError("--out, --branch-table and --names-table must be different files")
+    if Path(args.input).resolve() in resolved:
+        raise TwigError("an output file is the same as the input file")
+
+
+def describe(result: LabelingResult, locus: str) -> list[str]:
+    """Return log lines that say what each label set did to a tree."""
+    lines = []
+    for report in result.reports:
+        kind = f"{report.rule}, nuisance" if report.nuisance else report.rule
+        line = (
+            f"{locus}: label {report.name} ({kind}) selected {_count(report.selected, 'tip')}, "
+            f"covers {_count(report.claimed, 'branch')} and keeps {report.won}"
+        )
+        if report.cost is not None:
+            line += f", parsimony cost {report.cost}"
+        lines.append(line)
+    return lines
+
+
+def summarize(labels: dict[int, str | None], result: LabelingResult, locus: str) -> str:
+    """Return one log line that counts the labeled branches of a tree."""
+    counts = Counter(i for i in labels.values() if i)
+    unlabeled = sum(1 for i in labels.values() if not i)
+    parts = ", ".join(f"{label} {k}" for label, k in counts.most_common()) or "none"
+    line = f"{locus}: {_count(len(labels), 'branch')}, labeled {parts}, unlabeled {unlabeled}"
+    stems = result.counts.get("stems", 0)
+    if stems:
+        line += f", {_count(stems, 'stem')}"
+    return line
 
 
 def run_tree_label(args) -> None:
     """Run tree-label subcommand."""
     set_log_level(args.log_level)
-    raise TwigError("tree-label is planned for milestone M1 and is not available yet, see docs/labeling/design.md")
+    logger.info("CMD: " + " ".join(sys.argv))
+
+    # settings are checked before any tree is read
+    sets = build_label_sets(args)
+    config = build_config(args)
+    check_settings(sets, config)
+    writer = writers.get_writer(args.format)
+    rooting.check_root_edge_policy(args.root_edges)
+    check_outputs(args)
+    paml_codes = read_paml_codes(args.paml_codes)
+    table_writer = writers.get_writer("table")
+
+    species_of = None
+    if config.select_on == "species":
+        mapper = NameMapper.from_args(args)
+        if not (args.imap or args.delim or args.name_regex):
+            logger.warning("--select-on species was given without a map file, delimiter or regex, so every tip is its own species")
+        species_of = lambda name: mapper.resolve(name).species or name  # noqa: E731
+
+    records = list(batch.tree_records([args.input]))
+    logger.info(f"read {_count(len(records), 'tree')} from {args.input}")
+    if not sets:
+        what = "are cleared" if config.existing == "clear" else "are kept"
+        logger.info(f"no label sets were given, so the labels already in the tree {what}")
+
+    # one table of written names for all trees, so that a sample has the same name everywhere
+    names = None
+    if writer.sanitizer is not None:
+        names = NameTable(writer.sanitizer, suffix=args.sanitize_suffix)
+        for _, newick, _ in records:
+            names.update(treeio.tip_names(newick))
+        names.build()
+        changed = names.changed()
+        if changed:
+            logger.info(f"{_count(len(changed), 'tip name')} changed to be safe for {writer.sanitizer}" + (
+                f", see {args.names_table}" if args.names_table else ", use --names-table to save the table"))
+    elif args.names_table:
+        logger.warning("--names-table is only used with -F hyphy")
+
+    pieces: list[str] = []
+    table_pieces: list[str] = []
+    for number, (locus, newick, path) in enumerate(records):
+        parsed = treeio.parse_newick(newick, "auto", paml_codes, source=f"{path} ({locus})")
+        tree = parsed.tree
+        if parsed.root_label:
+            logger.warning(f"{locus}: ignoring the label {parsed.root_label!r} on the root, which has no branch")
+
+        outgroup_side = None
+        if args.outgroups:
+            try:
+                with at_tree(locus):
+                    rooted = rooting.reroot(tree, args.outgroups, args.root_edges, species_of)
+            except treeio.toytree_errors() as exc:
+                raise TwigError(f"{locus}: cannot reroot the tree ({exc})") from exc
+            tree, outgroup_side = rooted.tree, rooted.outgroup_side
+            logger.info(f"{locus}: {rooted.description}")
+            for note in rooted.notes:
+                logger.warning(f"{locus}: {note}")
+
+        with at_tree(locus):
+            result = apply_label_sets(tree, sets, config, species_of)
+        for line in describe(result, locus):
+            logger.info(line)
+        for message in result.warnings:
+            logger.warning(f"{locus}: {message}")
+        labeled = treeio.set_labels(tree, result.labels, inplace=True)
+        if not any(result.labels.values()):
+            logger.warning(f"{locus}: no branch is labeled")
+        logger.info(summarize(result.labels, result, locus))
+
+        ctx = writers.WriteContext(
+            locus=locus,
+            dists=not args.no_dists,
+            root_edges=args.root_edges,
+            keep_root=args.keep_root,
+            internal_names=args.internal_names,
+            names=names,
+            outgroup_side=outgroup_side,
+            kinds=result.kind,
+            sources=result.source,
+            species_of=species_of,
+            header=number == 0,
+        )
+        issues = writer.check(labeled, ctx)
+        for issue in warnings(issues):
+            logger.warning(str(issue))
+        if errors(issues):
+            raise TwigError("cannot write the tree\n" + "\n".join(f"  {i}" for i in errors(issues)))
+
+        with at_tree(locus):
+            pieces.append(writer.render(labeled, ctx))
+            if args.branch_table:
+                plan = writer.plan(labeled, ctx) if isinstance(writer, writers.TreeWriter) else None
+                table_pieces.append(table_writer.render(labeled, replace(ctx, plan=plan)))
+        if args.show:
+            heading = [f"tree {locus}"] if len(records) > 1 else []
+            sys.stderr.write("\n".join(heading + display.branch_listing(
+                labeled, result.labels, result.kind, result.source, species_of)) + "\n")
+
+    text = "\n".join(pieces) + "\n"
+    if args.branch_table:
+        batch.atomic_write(args.branch_table, "\n".join(table_pieces) + "\n", force=args.force)
+        logger.info(f"wrote the table of branches to {args.branch_table}")
+    if args.names_table and names is not None:
+        names.write_tsv(args.names_table, force=args.force)
+        logger.info(f"wrote the table of tip names to {args.names_table}")
+    if args.out:
+        batch.atomic_write(args.out, text, force=args.force)
+        logger.info(f"wrote {_count(len(pieces), 'tree')} to {args.out}")
+    else:
+        batch.write_stdout(text)
