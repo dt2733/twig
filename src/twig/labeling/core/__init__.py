@@ -14,13 +14,20 @@ import importlib
 _SUBMODULES = (
     "batch",
     "constants",
+    "display",
     "fasta",
+    "labelsets",
     "model",
     "names",
     "newick",
+    "parsimony",
+    "rooting",
+    "rules",
     "sanitize",
     "selectors",
     "treeio",
+    "validate",
+    "writers",
 )
 
 __all__ = list(_SUBMODULES)
