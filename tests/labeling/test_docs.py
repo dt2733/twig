@@ -201,3 +201,15 @@ class TestTreeLabelPage:
         rows = table_rows(text, "| column | meaning |")
         listed = [r[0].strip("`") for r in rows]
         assert listed == list(TableWriter().columns(WriteContext(species_of=str)))
+
+
+class TestTreeLabelExamplesOnThePage:
+    def test_the_examples_of_the_help_are_on_the_page(self):
+        from twig.labeling.parsers import TREE_LABEL_EXAMPLES
+        text = (DOCS / "tree-label.md").read_text()
+        documented = next(body for lang, body in code_blocks(text) if lang == "text" and body.startswith("Examples\n--------"))
+        assert documented.rstrip("\n") == TREE_LABEL_EXAMPLES.rstrip("\n")
+
+    def test_the_page_says_what_fitch_means(self):
+        text = (DOCS / "tree-label.md").read_text()
+        assert "Walter Fitch" in text and "1971" in text and "The rule `parsimony` means the same as `fitch`" in text

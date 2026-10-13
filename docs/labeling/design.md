@@ -1035,6 +1035,7 @@ Recorded on 2026-10-13, when `tree-label` was built. Where this section differs 
 4. **Branch table.** The columns of the `tree-label` table are `locus idx node is_tip n_tips tips species label kind source dist support written_name written merged_into note`, where `species` appears only with `--select-on species`. The `tips` column is cut after 200 names. The table describes the tree as it is written, so a dissolved root branch has `written` set to no.
 5. **Checks before work.** Label names, rules, costs, the root-edge policy and the output paths are checked before any tree is read. Label names must be valid for HyPhy in every output format, so that a labeled tree can always be used for HyPhy later.
 6. **Root labels.** A label on the root of the input is ignored with a warning. Rerooting joins the two old root branches by the `--root-edges` policy before toytree moves the root, and the branch that the new root cuts keeps its label on both halves.
+7. **Help and examples.** The help of `tree-label` explains each option in plain words and ends with a list of examples that shows every rule and every option on one small tree. The tests run each command and compare its output with the help, and they check that every option has an example. The rule `parsimony` is accepted as a synonym of `fitch`, and the help says what the name means.
 
 ---
 
