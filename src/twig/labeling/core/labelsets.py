@@ -34,12 +34,13 @@ from pathlib import Path
 from twig.utils import TwigError
 from twig.labeling.core.constants import DEFAULT_NUISANCE_LABEL, PRECEDENCE_CHOICES
 from twig.labeling.core.parsimony import to_fraction
-from twig.labeling.core.rules import RULES, RuleInput, make_options, resolve_rule
+from twig.labeling.core.rules import AMBIGUOUS_MODES, RULES, RuleInput, make_options, resolve_rule
 from twig.labeling.core.sanitize import check_label_names
 from twig.labeling.core.selectors import Selector
 
 NUISANCE_RULE = "all"
 SPEC_OPTIONS = ("ambiguous", "gain-cost", "loss-cost")
+SWITCH_MODES = ("keep", "unlabel")
 
 
 @dataclass(frozen=True)
@@ -224,15 +225,30 @@ def select_tips(
 # applying label sets
 ###########################################################################
 
+def _check_mode(value: str, modes: Sequence[str], where: str) -> None:
+    """Raise a TwigError if a value is a mode written in another case, which would make it a label name."""
+    if value not in modes and value.lower() in modes:
+        raise TwigError(
+            f"{where} would be read as a label name, but it looks like the mode {value.lower()!r}. "
+            f"Modes are written in lower case, so give {value.lower()} for the mode or choose another label name"
+        )
+
+
 def _check_names(sets: Sequence[LabelSet], config: LabelingConfig) -> None:
     names = [s.name for s in sets]
     names += [i for i in (config.background,) if i]
-    for switch in (config.stems, config.losses):
-        if switch not in ("keep", "unlabel"):
+    for option, switch in (("--stems", config.stems), ("--losses", config.losses)):
+        _check_mode(switch, SWITCH_MODES, f"{option} {switch!r}")
+        if switch not in SWITCH_MODES:
             names.append(switch)
-    if config.ambiguous not in ("acctran", "deltran", "unlabel"):
+    _check_mode(config.ambiguous, AMBIGUOUS_MODES, f"--ambiguous {config.ambiguous!r}")
+    if config.ambiguous not in AMBIGUOUS_MODES:
         names.append(config.ambiguous)
-    names += [s.ambiguous for s in sets if s.ambiguous and s.ambiguous not in ("acctran", "deltran", "unlabel")]
+    for item in sets:
+        if item.ambiguous:
+            _check_mode(item.ambiguous, AMBIGUOUS_MODES, f"the option ambiguous={item.ambiguous} of the label {item.name!r}")
+            if item.ambiguous not in AMBIGUOUS_MODES:
+                names.append(item.ambiguous)
     check_label_names(dict.fromkeys(names))
 
 

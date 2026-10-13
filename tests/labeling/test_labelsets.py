@@ -267,6 +267,20 @@ class TestWarningsAndErrors:
         with pytest.raises(TwigError, match="invalid label name"):
             apply_label_sets(fresh(), [exact("A")], cfg(stems="Stem-1"))
 
+    @pytest.mark.parametrize("settings", [
+        dict(ambiguous="Deltran"), dict(ambiguous="ACCTRAN"), dict(ambiguous="Unlabel"),
+        dict(stems="Keep"), dict(losses="UNLABEL"),
+    ])
+    def test_modes_in_another_case_are_refused(self, settings):
+        # Deltran used to become a label name that was put on the ambiguous branches
+        with pytest.raises(TwigError, match="looks like the mode"):
+            apply_label_sets(fresh(), [exact(*DIOECIOUS)], cfg(**settings))
+
+    def test_a_mode_in_another_case_is_refused_in_a_spec_option(self):
+        item = LabelSet("Test", "fitch", DIOECIOUS, ambiguous="Deltran")
+        with pytest.raises(TwigError, match="ambiguous=Deltran of the label 'Test' would be read as a label name"):
+            apply_label_sets(fresh(), [item], cfg())
+
     def test_costs_cannot_both_be_zero(self):
         # every history would cost nothing, and acctran used to give an arbitrary alternating labeling
         with pytest.raises(TwigError, match="costs nothing to gain or to lose"):

@@ -451,6 +451,10 @@ class TestErrors:
         code, _, err = run(f"-i {NAMED} -L Test {DIOECIOUS} --rule fitch --loss-cost -1")
         assert code == 1 and "cannot be negative" in err
 
+    def test_a_mode_written_in_capitals_is_not_taken_as_a_label_name(self, run):
+        code, out, err = run(f"-i {NAMED} -L Test {DIOECIOUS} --rule fitch --ambiguous Deltran")
+        assert code == 1 and out == "" and "looks like the mode 'deltran'" in err and "Traceback" not in err
+
     def test_very_large_costs_work_and_zero_costs_are_refused(self, run):
         code, out, err = run(f"-i {NAMED} -L Test {DIOECIOUS} --rule fitch --gain-cost 1e400 --internal-names keep")
         assert code == 0 and "Traceback" not in err and "parsimony cost 4" in err
