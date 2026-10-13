@@ -89,6 +89,15 @@ class TestDesignTable:
         assert {tree[i].name: v for i, v in out.labels.items() if tree[i].name in ("ABC", "BC", "A", "DE")} == {
             "ABC": "Maybe", "BC": "Maybe", "A": "Test", "DE": "Test"}
 
+    def test_an_unknown_tip_can_be_ambiguous(self, tree):
+        # M1 has either state in the equally good histories, which used to be ignored for tips
+        out = run(tree, "fitch", unknown=["M1"], ambiguous="unlabel")
+        assert "M1" in names_of(tree, out.ambiguous) and "M1" not in where(tree, out)
+        out = run(tree, "fitch", unknown=["M1"], ambiguous="Maybe")
+        assert {tree[i].name: v for i, v in out.labels.items()}["M1"] == "Maybe"
+        assert "M1" in where(tree, run(tree, "fitch", unknown=["M1"], ambiguous="acctran"))
+        assert "M1" not in where(tree, run(tree, "fitch", unknown=["M1"], ambiguous="deltran"))
+
     def test_losses_are_only_certain_when_ambiguous_nodes_are_not_resolved(self, tree):
         # with the stem ambiguous the loss on C is not certain
         assert run(tree, "fitch", ambiguous="unlabel").losses == frozenset()

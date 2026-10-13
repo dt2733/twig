@@ -88,6 +88,11 @@ class TestRulesOnTheDesignedSpeciesTree:
         _, out, _ = run(f"-i {NAMED} -L Test {DIOECIOUS} --rule all --leaf-nodes skip --internal-names keep")
         assert set(labeled_names(out)) == {"DE"}
 
+    def test_skipped_tips_do_not_get_the_background_label(self, run):
+        _, out, _ = run(f"-i {NAMED} -L Test {DIOECIOUS} --rule fitch --stems unlabel --leaf-nodes skip --background Reference --internal-names keep")
+        names = labeled_names(out)
+        assert not {"A", "B", "D", "E"} & set(names) and names["BC"] == "Test" and names["C"] == "Reference"
+
     def test_the_tips_rule_cannot_skip_tips(self, run):
         code, _, err = run(f"-i {NAMED} -L Test {DIOECIOUS} --rule tips --leaf-nodes skip")
         assert code == 1 and "labels nothing" in err and "Traceback" not in err

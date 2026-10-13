@@ -285,7 +285,8 @@ def apply_label_sets(
     same branch the precedence decides, and a nuisance label always wins.
     Tip labels can be skipped, stems and losses are unlabeled or renamed, and the
     background label goes to every branch that is still free, except stems,
-    losses and ambiguous branches that were deliberately left unlabeled.
+    losses, ambiguous branches and skipped tips that were deliberately left
+    unlabeled.
     """
     check_settings(sets, config)
     warnings: list[str] = []
@@ -384,11 +385,15 @@ def apply_label_sets(
         number = winner_set.get(idx)
         return number is not None and not sets[number].nuisance
 
-    # tips are not labeled if the user asked to skip them, except nuisance tips
+    held: set[int] = set()        # branches that the background label must not take
+
+    # tips are not labeled if the user asked to skip them, except nuisance tips,
+    # and a skipped tip is left out of the background too
     if config.leaf_nodes == "skip":
         for node in leaves:
             if node.up is not None and labels.get(node.idx) and from_regular_set(node.idx):
                 labels[node.idx], source[node.idx] = None, ""
+                held.add(node.idx)
 
     # stems are labeled branches of the sets that do not continue a labeled parent
     regular = {idx for idx in source if labels.get(idx) and from_regular_set(idx)}
@@ -408,7 +413,6 @@ def apply_label_sets(
         else:
             kind[node.idx] = "internal"
 
-    held: set[int] = set()        # branches that the background label must not take
     counts: dict[str, int] = {"stems": len(stems)}
     if config.stems == "unlabel":
         for idx in stems:

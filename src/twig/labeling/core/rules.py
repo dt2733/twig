@@ -204,9 +204,10 @@ def rule_fitch(inp: RuleInput) -> RuleOutput:
         tie=opts.ambiguous if explicit else "acctran",
     )
 
-    internal_ambiguous = {
+    # a tip can be ambiguous too, if its state is unknown
+    ambiguous = {
         node.idx for node in inp.tree
-        if not node.is_leaf() and not is_root(node) and len(result.state_sets[node.idx]) == 2
+        if not is_root(node) and len(result.state_sets[node.idx]) == 2
     }
     labels: dict[int, str] = {}
     losses = set()
@@ -223,7 +224,7 @@ def rule_fitch(inp: RuleInput) -> RuleOutput:
             sets = result.state_sets
             if sets[idx] == {1}:
                 labels[idx] = inp.label
-            elif idx in internal_ambiguous and opts.ambiguous != "unlabel":
+            elif idx in ambiguous and opts.ambiguous != "unlabel":
                 labels[idx] = opts.ambiguous
             if sets[idx] == {0} and sets[parent.idx] == {1}:
                 losses.add(idx)
@@ -231,7 +232,7 @@ def rule_fitch(inp: RuleInput) -> RuleOutput:
         labels,
         direct=frozenset(i for i in labels if i in inp.selected),
         losses=frozenset(losses),
-        ambiguous=frozenset(internal_ambiguous),
+        ambiguous=frozenset(ambiguous),
         cost=result.cost,
     )
 

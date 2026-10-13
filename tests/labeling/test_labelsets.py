@@ -115,6 +115,15 @@ class TestDesignExample:
         assert labels["X"] == "Reference" and labels["A"] == "Test" and labels["DE"] == "Test"
         assert result.counts["ambiguous"] == 2
 
+    def test_an_unknown_tip_with_an_ambiguous_state_is_treated_like_an_ambiguous_branch(self):
+        # M1 has either state in the equally good histories, and it used to get the background label
+        tree = fresh(NAMED)
+        result = apply_label_sets(tree, [exact(*DIOECIOUS)], cfg(unknown=("M1",), ambiguous="unlabel", background="Reference"))
+        labels = by_name(tree, result)
+        assert labels["M1"] is None and labels["X"] is None and labels["M2"] == "Reference"
+        result = apply_label_sets(tree, [exact(*DIOECIOUS)], cfg(unknown=("M1",), ambiguous="Unsure", background="Reference"))
+        assert by_name(tree, result)["M1"] == "Unsure"
+
     def test_other_rules(self):
         tree = fresh(NAMED)
         result = apply_label_sets(tree, [exact(*DIOECIOUS, rule="all")], cfg())
@@ -216,6 +225,17 @@ class TestPrecedence:
         tree = fresh(NAMED)
         result = apply_label_sets(tree, [exact(*DIOECIOUS, rule="all")], cfg(leaf_nodes="skip"))
         assert [k for k, v in by_name(tree, result).items() if v] == ["DE"]
+
+    def test_skipped_tips_are_left_out_of_the_background(self):
+        # the skipped tips of the selected species used to get the background label
+        tree = fresh(NAMED)
+        result = apply_label_sets(tree, [exact(*DIOECIOUS)], cfg(stems="unlabel", leaf_nodes="skip", background="Reference"))
+        labels = by_name(tree, result)
+        assert [labels[n] for n in "ABDE"] == [None] * 4
+        assert labels["BC"] == "Test" and labels["C"] == "Reference" and labels["M1"] == "Reference"
+        result = apply_label_sets(tree, [exact(*DIOECIOUS, rule="all")], cfg(leaf_nodes="skip", background="Reference"))
+        labels = by_name(tree, result)
+        assert [labels[n] for n in "ABDE"] == [None] * 4 and labels["DE"] == "Test" and labels["C"] == "Reference"
 
     def test_the_tips_rule_labels_nothing_when_tip_labels_are_skipped(self):
         with pytest.raises(TwigError, match="labels nothing"):
