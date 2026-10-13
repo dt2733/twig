@@ -45,8 +45,12 @@ DISPATCH = {
     # "macse-trim": "..seqlab",
     # "macse-align": "..seqlab",
     # "macse-refine": "..seqlab",
+    "name-map": "..labeling",
     "partition-cds": "..seqlab",
+    "sample-reduce": "..labeling",
     "tree-filter": "..treelab",
+    "tree-label": "..labeling",
+    "tree-label-transfer": "..labeling",
     "tree-rooter": "..treelab",
     "tree-skeleton": "..treelab",
 }

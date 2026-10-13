@@ -1126,3 +1126,7 @@ def get_parser_filter_concat(parser: ArgumentParser | None = None) -> ArgumentPa
 
 
 # ...
+
+
+# the tree labeling commands define their parsers in twig.labeling.parsers
+from twig.labeling.parsers import get_parser_name_map, get_parser_sample_reduce, get_parser_tree_label, get_parser_tree_label_transfer  # noqa: E402,F401
