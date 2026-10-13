@@ -1025,6 +1025,17 @@ Recorded on 2026-10-13, after the design document was committed.
 7. **Internal names.** `--internal-names none` is the default.
 8. **HyPhy runner.** twig stops at writing HyPhy inputs and `hyphy_commands.sh`. A command that runs HyPhy is not planned.
 
+## H.7 Decisions made while building M1
+
+Recorded on 2026-10-13, when `tree-label` was built. Where this section differs from the sections above, this section is what the code does.
+
+1. **Tie rule.** The default of `--ambiguous` is `acctran`, not `deltran` as written in G.1. On the species tree the trait can have been gained on the branch above A, B and C and lost on C, or it can have been gained separately on A and on B, and both histories cost 3. The `fitch` row of H.1 and the figure in C.2 show the first history, and only `acctran` produces it. The value `deltran` stays available and labels A, B, D, E and DE. The statement in H.1 that the reconstruction is unique is therefore not right.
+2. **Nuisance species.** `--nuisance SELECTOR...` and `--nuisance-label NAME` (default `Nuisance`) mark species or clades as nuisance, with the rule `all`. A nuisance label beats every other label, labels already in the tree included. It is not changed by `--stems`, `--losses`, `--leaf-nodes skip` or `--background`, and its tips have an unknown state in parsimony. Tips given with `--unknown` that are not nuisance take the state that parsimony infers for them, and are labeled with it.
+3. **Extra options.** `tree-label` also has `--paml-codes` (names for PAML label numbers), `--sanitize-suffix` and `--names-table` (the table of written tip names), which the table in G.1 does not list.
+4. **Branch table.** The columns of the `tree-label` table are `locus idx node is_tip n_tips tips species label kind source dist support written_name written merged_into note`, where `species` appears only with `--select-on species`. The `tips` column is cut after 200 names. The table describes the tree as it is written, so a dissolved root branch has `written` set to no.
+5. **Checks before work.** Label names, rules, costs, the root-edge policy and the output paths are checked before any tree is read. Label names must be valid for HyPhy in every output format, so that a labeled tree can always be used for HyPhy later.
+6. **Root labels.** A label on the root of the input is ignored with a warning. Rerooting joins the two old root branches by the `--root-edges` policy before toytree moves the root, and the branch that the new root cuts keeps its label on both halves.
+
 ---
 
 # Appendix. Notes on existing twig code (not changed by this work)

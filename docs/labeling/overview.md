@@ -12,7 +12,7 @@ The commands are developed in milestones, and a command that is planned but not 
 | command | purpose | status |
 |---|---|---|
 | `twig name-map` | resolve every tip and sequence name to a species, print the table for checking, and freeze it for reuse | available, see [name-map](name-map.md) |
-| `twig tree-label` | label one tree, usually the species tree, from tip selections | planned for milestone M1 |
+| `twig tree-label` | label one tree, usually the species tree, from tip selections | available, see [tree-label](tree-label.md) |
 | `twig tree-label-transfer` | copy the labels of the species tree onto each gene tree and write the trees with their alignments | planned for milestone M2 |
 | `twig sample-reduce` | reduce gene trees and alignments to one specimen per species | planned for milestone M4 |
 
@@ -44,9 +44,9 @@ The change from one state to another happened somewhere along a stem, at an unkn
 
 ## Nuisance species
 
-A nuisance species is one that you do not want in the test set or in the reference set. A reversion to the ancestral state is one reason, and there are many others, such as an uncertain trait state, a hybrid, or poor sequence quality. Most people cannot know in advance that a species is a reversion, so twig does not depend on detecting reversions. You will be able to mark any species or clade as nuisance, whether or not parsimony finds a loss there.
+A nuisance species is one that you do not want in the test set or in the reference set. A reversion to the ancestral state is one reason, and there are many others, such as an uncertain trait state, a hybrid, or poor sequence quality. Most people cannot know in advance that a species is a reversion, so twig does not depend on detecting reversions. You mark any species or clade as nuisance with `--nuisance` in [tree-label](tree-label.md), whether or not parsimony finds a loss there. Nuisance species get a label of their own, no other label overwrites it, and parsimony treats their state as unknown, so the history of the trait is inferred from the other species.
 
-How nuisance species are handled is a choice made for each analysis, because it depends on the program. RELAX can set them aside as unclassified branches that are fitted but left out of the comparison. BUSTED-PH has no such set, so a nuisance species must either be removed from the tree and the alignment or accepted as background. The exact options are settled when `tree-label` and `tree-label-transfer` are built, and the choice of label name is yours. The label `Rev` in the tree above is only an example.
+How nuisance species are handled by a program is a choice made for each analysis, because it depends on the program. RELAX can set them aside as unclassified branches that are fitted but left out of the comparison. BUSTED-PH has no such set, so a nuisance species must either be removed from the tree and the alignment or accepted as background. That choice is made when the labels are copied to gene trees, which `tree-label-transfer` will do. The choice of label name is yours, and the label `Rev` in the tree above is only an example.
 
 ## What an unlabeled branch means
 

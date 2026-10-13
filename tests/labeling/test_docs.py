@@ -116,3 +116,88 @@ class TestNameMapPage:
         messages = [re.sub(prefix, "", line) for line in result.stderr.splitlines()]
         messages = [m for m in messages if not m.startswith(("CMD:", "the species vocabulary"))]
         assert documented.splitlines() == messages
+
+
+def normalized(line):
+    """Return the non-empty fields of a line of a table, whether they are separated by tabs or by spaces."""
+    return [f for f in re.split(r"\t|\s{2,}", line.strip()) if f]
+
+
+def command_pairs(text, prefix):
+    """Return (command, output) for every bash block that starts with prefix and is followed by a text block."""
+    blocks = code_blocks(text)
+    return [
+        (body.strip(), blocks[i + 1][1])
+        for i, (lang, body) in enumerate(blocks[:-1])
+        if lang == "bash" and body.startswith(prefix) and blocks[i + 1][0] == "text"
+    ]
+
+
+def table_rows(text, after):
+    """Return the cells of the rows of the markdown table that follows a given sentence or starts with a given line."""
+    rows, started = [], False
+    for line in text[text.index(after):].splitlines():
+        if line.startswith("|"):
+            started = True
+            rows.append([c.strip() for c in line.strip().strip("|").split("|")])
+        elif started:
+            break
+    return rows[2:]
+
+
+class TestTreeLabelPage:
+    @pytest.fixture
+    def text(self):
+        return (DOCS / "tree-label.md").read_text()
+
+    def test_help_text_is_current(self, text):
+        from twig.labeling.parsers import get_parser_tree_label
+        documented = block_after(text, "twig tree-label -h")
+        actual = get_parser_tree_label().format_help().split("\nExamples\n")[0]
+        assert documented.rstrip("\n") == actual.rstrip("\n")
+
+    def test_every_example_gives_the_documented_output(self, text, data_dir):
+        pairs = [(c, o) for c, o in command_pairs(text, "twig tree-label") if c != "twig tree-label -h"]
+        assert len(pairs) >= 8
+        for command, documented in pairs:
+            result = subprocess.run(command, shell=True, cwd=data_dir, capture_output=True, text=True)
+            assert result.returncode == 0, (command, result.stderr)
+            assert [normalized(i) for i in documented.splitlines()] == [normalized(i) for i in result.stdout.splitlines()], command
+
+    def test_the_table_of_rules_is_current(self, text, data_dir):
+        pytest.importorskip("toytree")
+        from twig.labeling.core import treeio
+        rows = table_rows(text, "The next table shows what each rule labels")
+        assert len(rows) >= 7
+        for options, expected in rows:
+            words = options.strip("`").split()
+            command = ["twig", "tree-label", "-i", "species.named.nwk", "-L", "Test", "dioecious.txt",
+                       "--rule", *words, "--internal-names", "keep", "-l", "ERROR"]
+            result = subprocess.run(command, cwd=data_dir, capture_output=True, text=True, check=True)
+            tree = treeio.read_tree(result.stdout.strip())
+            assert {n.name for n in tree if n.label} == set(expected.split(", ")), options
+
+    def test_the_rules_and_their_hyphy_names_are_listed(self, text):
+        from twig.labeling.core.constants import RULE_NAMES
+        from twig.labeling.core.rules import resolve_rule
+        rows = table_rows(text, "| rule | HyPhy name | branches covered |")
+        assert [r[0].strip("`") for r in rows] == list(RULE_NAMES)
+        for rule, hyphy, _ in rows:
+            if hyphy != "not in HyPhy":
+                assert resolve_rule(hyphy) == rule.strip("`")
+
+    def test_the_root_edge_values_are_listed(self, text):
+        from twig.labeling.core.constants import ROOT_EDGE_POLICIES
+        rows = table_rows(text, "| value | label of the joined branch |")
+        assert [r[0].strip("`") for r in rows[:-1]] == list(ROOT_EDGE_POLICIES) and rows[-1][0] == "a label name"
+
+    def test_the_formats_are_listed(self, text):
+        from twig.labeling.core.constants import FORMAT_NAMES
+        rows = table_rows(text, "| format | output |")
+        assert [r[0].strip("`") for r in rows] == list(FORMAT_NAMES)
+
+    def test_the_columns_of_the_branch_table_are_listed(self, text):
+        from twig.labeling.core.writers import TableWriter, WriteContext
+        rows = table_rows(text, "| column | meaning |")
+        listed = [r[0].strip("`") for r in rows]
+        assert listed == list(TableWriter().columns(WriteContext(species_of=str)))
