@@ -30,7 +30,6 @@ from fractions import Fraction
 
 from twig.utils import TwigError
 
-INF = float("inf")
 TIES = ("deltran", "acctran")
 
 
@@ -101,6 +100,10 @@ def sankoff_binary(
     cost = ((Fraction(0), to_fraction(gain)), (to_fraction(loss), Fraction(0)))
     root = tree.treenode
 
+    # the cost of an impossible state, more than any history can cost, kept as
+    # a fraction because a float would overflow when it meets very large costs
+    impossible = (cost[0][1] + cost[1][0] + 1) * (sum(1 for _ in tree) + 1)
+
     # downpass, d[idx][s] is the cost of the subtree below idx if idx has state s
     down: dict[int, tuple] = {}
     for node in tree:
@@ -110,14 +113,14 @@ def sankoff_binary(
             state = tip_states[node.idx]
             if state not in (0, 1, None):
                 raise TwigError(f"the state of tip {node.name!r} must be 0, 1 or None, got {state!r}")
-            down[node.idx] = tuple(0 if state in (s, None) else INF for s in (0, 1))
+            down[node.idx] = tuple(Fraction(0) if state in (s, None) else impossible for s in (0, 1))
         else:
             down[node.idx] = tuple(
                 sum(min(cost[s][t] + down[child.idx][t] for t in (0, 1)) for child in node.children)
                 for s in (0, 1)
             )
 
-    root_cost = tuple(0 if str(root_state) in ("free", str(s)) else INF for s in (0, 1))
+    root_cost = tuple(Fraction(0) if str(root_state) in ("free", str(s)) else impossible for s in (0, 1))
     best = min(down[root.idx][s] + root_cost[s] for s in (0, 1))
 
     # uppass, up[idx][s] is the cost of everything outside idx if idx has state s

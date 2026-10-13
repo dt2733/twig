@@ -247,6 +247,13 @@ def check_settings(sets: Sequence[LabelSet], config: LabelingConfig) -> None:
     for item in sets:
         if item.rule == "tips" and config.leaf_nodes == "skip" and not item.nuisance:
             raise TwigError(f"the label {item.name!r} uses the tips rule, which labels nothing when tip labels are skipped")
+        gain = item.gain_cost if item.gain_cost is not None else config.gain_cost
+        loss = item.loss_cost if item.loss_cost is not None else config.loss_cost
+        if item.rule == "fitch" and to_fraction(gain) == 0 and to_fraction(loss) == 0:
+            raise TwigError(
+                f"the label {item.name!r} costs nothing to gain or to lose, so every history is equally good "
+                "and parsimony cannot choose one. Give --gain-cost or --loss-cost a value above 0"
+            )
 
 
 def apply_label_sets(

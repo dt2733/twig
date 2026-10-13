@@ -451,6 +451,13 @@ class TestErrors:
         code, _, err = run(f"-i {NAMED} -L Test {DIOECIOUS} --rule fitch --loss-cost -1")
         assert code == 1 and "cannot be negative" in err
 
+    def test_very_large_costs_work_and_zero_costs_are_refused(self, run):
+        code, out, err = run(f"-i {NAMED} -L Test {DIOECIOUS} --rule fitch --gain-cost 1e400 --internal-names keep")
+        assert code == 0 and "Traceback" not in err and "parsimony cost 4" in err
+        assert set(labeled_names(out)) == {"A", "B", "BC", "ABC", "D", "E", "DE", "X", "Y", "Z"}
+        code, out, err = run(f"-i {NAMED} -L Test {DIOECIOUS} --rule fitch --gain-cost 0 --loss-cost 0")
+        assert code == 1 and out == "" and "costs nothing to gain or to lose" in err
+
     def test_expensive_gains_are_avoided_by_gaining_once_above_the_ingroup(self, run):
         _, out, _ = run(f"-i {NAMED} -L Test {DIOECIOUS} --rule fitch --gain-cost 3 --internal-names keep")
         assert set(labeled_names(out)) == {"A", "B", "BC", "ABC", "D", "E", "DE", "X", "Y", "Z"}

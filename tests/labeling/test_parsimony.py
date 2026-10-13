@@ -111,6 +111,15 @@ class TestExactness:
         assert result.cost == Fraction(1, 10)
         assert isinstance(result.cost, Fraction)
 
+    def test_very_large_costs_are_exact(self):
+        # an impossible state used to cost a float infinity, which overflowed when it met a cost of 1e400
+        tree = species()
+        result = sankoff_binary(tree, tip_states(tree, "ABDE"), gain="1e400", root_state=0)
+        assert result.cost == Fraction(10) ** 400 + 3
+        assert ones(tree, result) == ["A", "ABC", "B", "BC", "D", "DE", "E", "I", "X", "Y"]
+        result = sankoff_binary(tree, tip_states(tree, "ABDE"), gain="1e400")
+        assert result.cost == 4 and result.states[tree.treenode.idx] == 1
+
     def test_polytomies_are_handled(self):
         tree = treeio.read_tree("(A,B,C,D)R;")
         result = sankoff_binary(tree, {0: 1, 1: 1, 2: 1, 3: 0})

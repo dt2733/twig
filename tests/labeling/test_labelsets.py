@@ -267,6 +267,17 @@ class TestWarningsAndErrors:
         with pytest.raises(TwigError, match="invalid label name"):
             apply_label_sets(fresh(), [exact("A")], cfg(stems="Stem-1"))
 
+    def test_costs_cannot_both_be_zero(self):
+        # every history would cost nothing, and acctran used to give an arbitrary alternating labeling
+        with pytest.raises(TwigError, match="costs nothing to gain or to lose"):
+            apply_label_sets(fresh(), [exact(*DIOECIOUS)], cfg(gain_cost=Fraction(0), loss_cost=Fraction(0)))
+        free = LabelSet("Test", "fitch", DIOECIOUS, gain_cost=Fraction(0), loss_cost=Fraction(0))
+        with pytest.raises(TwigError, match="costs nothing to gain or to lose"):
+            apply_label_sets(fresh(), [free], cfg())
+        # one free change is allowed, and so are zero costs for a rule that does not use them
+        apply_label_sets(fresh(), [exact(*DIOECIOUS)], cfg(gain_cost=Fraction(0)))
+        apply_label_sets(fresh(), [exact(*DIOECIOUS, rule="all")], cfg(gain_cost=Fraction(0), loss_cost=Fraction(0)))
+
     def test_per_set_costs_override_the_defaults(self):
         tree = fresh(NAMED)
         loss_costly = LabelSet("Test", "fitch", DIOECIOUS, loss_cost=Fraction(2))
