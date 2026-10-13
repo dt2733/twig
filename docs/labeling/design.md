@@ -999,12 +999,31 @@ Each milestone ships with its tests and docs and changes no existing twig behavi
 7. **Internal names in HyPhy trees.** None by default, or `twn1`, `twn2` names so HyPhy branch results join to twig's branch table?
 8. **HyPhy runner.** Stop at writing inputs and `hyphy_commands.sh`, or later add a command that runs HyPhy?
 
+The answers are recorded in H.6.
+
 ## H.5 Execution on approval and verification
 
 1. Create `docs/labeling/design.md` with this document's content. No other file is created or changed in this step.
 2. Check with `git status` and `git diff --stat` that the only change is that new file.
 3. Commit with a message describing the design document, and push with `git push -u origin tree-labeling`.
 4. Start M0 only after the user answers H.4. At each milestone, verify by installing toytree in the session (`pip install toytree pytest`), running `pytest tests/labeling`, running `twig -h` and each new command on `tests/labeling/data/`, comparing outputs with the expected trees in H.1, and confirming with `git diff --stat` that existing files changed only as listed in B.2.
+
+## H.6 Answers to the open questions
+
+Recorded on 2026-10-13, after the design document was committed.
+
+1. **Command names.** Keep `name-map`, `tree-label`, `tree-label-transfer` and `sample-reduce`. None of them, nor the alternatives `label-names` and `label-reduce`, appears in the `DISPATCH` of this fork or of upstream eaton-lab/twig. The upstream check required by B.5 was made on 2026-10-13 against upstream commit `9bc5a7e`, which is identical to the fork's `main`.
+2. **mkdocs nav.** Keep the pages unlisted for now. `mkdocs.yml` is not edited, so the optional row in B.2 is dropped unless the user asks for it later.
+3. **Matching default.** Split matching, with `--match clade` available.
+4. **Merged branches.** `--merge-tips tipward` and `--merge unanimous`, as planned.
+5. **Root edges.** `--root-edges unlabel`, as planned.
+6. **Reversions and nuisance species.** Neither fixed option was chosen, and the user gave a direction instead. Most people cannot know in advance whether a species is a reversion, so twig must not depend on detecting reversions. A user needs the flexibility to mark any species or clade as nuisance for any reason, and how nuisance species are handled must be a choice made per analysis, because it depends on the program. The consequences are listed below.
+   - `Rev` in C.2 is one example of a label the user picked and not a built-in. Documentation uses a generic nuisance label in its examples.
+   - A species or clade can be marked as nuisance directly with `-L NAME:tips SELECTOR` (precedence `specific`), whether or not parsimony finds a loss there. `--losses` stays as an optional convenience.
+   - How the nuisance label is treated is chosen at transfer time with masks, namely `-m NAME=prune`, `-m NAME=unlabel`, `-m NAME=Test` or `-m NAME=Reference`. RELAX sets aside any branch that is neither Test nor Reference. BUSTED-PH has no such set, so the species is either pruned or accepted as background. The preset warnings in G.2 name that consequence for each program.
+   - The exact options (for example a `--nuisance` shorthand for `tree-label`, and whether nuisance tips count as unknown state in parsimony) are settled when M1 and M2 are built, and are confirmed with the user at that point.
+7. **Internal names.** `--internal-names none` is the default.
+8. **HyPhy runner.** twig stops at writing HyPhy inputs and `hyphy_commands.sh`. A command that runs HyPhy is not planned.
 
 ---
 
