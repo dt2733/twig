@@ -103,6 +103,16 @@ class TestHyphy:
     def test_keep_root_writes_the_rooted_tree(self):
         assert render("hyphy", LABELED, keep_root=True) == LABELED
 
+    def test_lengths_that_the_input_did_not_have_are_not_invented(self):
+        # the tips and the merged root branch were written with toytree's 1.0, and O with 2
+        out = render("hyphy", "(O,((M1,(A,(B,C)1:0.5)0.9:0.3)1:1.2,(M2,(D,E)1:0.8)1:0.4));")
+        assert out == "(O,(M1,(A,(B,C):0.5):0.3):1.2,(M2,(D,E):0.8):0.4);"
+        assert render("hyphy", "((A,B):1,(C:1,D:1):2);") == "(A,B,(C:1,D:1):3);"
+        assert render("hyphy", "((A:1,B:1),(C:1,D:1):2);") == "(A:1,B:1,(C:1,D:1));"
+
+    def test_short_branches_without_a_length_are_not_reported(self):
+        assert check("hyphy", "((A:1,B:1){T},(C:1,D:1):0.5,E:1);") == []
+
     @pytest.mark.parametrize("policy, expected", [
         ("unlabel", "(O:2,"),
         ("labeled", "(O:2,"),
@@ -292,6 +302,11 @@ class TestTable:
     def test_no_lengths_for_a_tree_read_without_them(self):
         _, rows = self.rows(LABELED)
         assert {r["dist"] for r in rows} == {""}
+
+    def test_no_length_for_a_branch_that_had_none(self):
+        _, rows = self.rows("((A,B:2):1,C);", writer="hyphy")
+        assert {r["node"]: r["dist"] for r in rows if r["is_tip"] == "yes"} == {"A": "", "B": "2", "C": ""}
+        assert [r["dist"] for r in rows if r["is_tip"] == "no"] == ["1"]
 
     def test_the_root_merge_is_marked(self):
         _, rows = self.rows(DISTINCT, writer="hyphy")

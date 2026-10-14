@@ -228,6 +228,18 @@ class TestReadTree:
         assert treeio.has_dists(treeio.read_tree(SPECIES)) is False
         assert treeio.has_dists(treeio.read_tree(LABELED)) is False
         assert treeio.has_dists(treeio.read_tree(LABELED).copy()) is False
+        # the root has no branch, so a length on it alone does not count
+        assert treeio.has_dists(treeio.read_tree("((A,B),C):0;")) is False
+
+    def test_branches_without_a_length_are_marked(self):
+        # as in an ASTRAL species tree, which has internal lengths and none for the tips
+        tree = treeio.read_tree("(O,((M1,(A,(B,C)1:0.5)0.9:0.3)1:1.2,(M2,(D,E)1:0.8)1:0.4));")
+        assert treeio.has_dists(tree) is True
+        below = {n.idx: "".join(sorted(l.name for l in n.iter_leaves())) for n in tree}
+        given = sorted(below[n.idx] for n in tree if n.up is not None and treeio.has_dist(n))
+        assert given == ["ABC", "ABCM1", "BC", "DE", "DEM2"]
+        assert "has_dist" in tree.edge_features
+        assert all(treeio.has_dist(n) for n in treeio.read_tree("((A:1,B:2):1,C:3);"))
 
     def test_root_label_is_dropped(self):
         parsed = treeio.parse_newick("(A{Test},B{Test}){Test};")

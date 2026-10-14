@@ -76,24 +76,38 @@ def write_dists(tree, ctx: WriteContext) -> bool:
     """Return True if branch lengths are written, which needs lengths in the tree.
 
     toytree gives 1.0 to a missing branch length, so a tree read without lengths
-    is written without them rather than with invented ones.
+    is written without them rather than with invented ones, and so is each
+    branch that had no length in a tree with lengths elsewhere.
     """
     return ctx.dists and treeio.has_dists(tree)
 
 
-def written_branches(tree, merge: RootMerge | None) -> Iterator[tuple[object, str | None, float]]:
+def branch_length(tree, node, merge: RootMerge | None = None) -> float | None:
+    """Return the length of the branch above a node as it is written, or None if it has none.
+
+    The kept child of a root merge has the summed length of the two branches at
+    the root, and no length if either of them had none in the input.
+    """
+    if not treeio.has_dists(tree) or not treeio.has_dist(node):
+        return None
+    if merge is not None and node.idx == merge.kept:
+        dissolved = tree[merge.dissolved]
+        return node.dist + dissolved.dist if treeio.has_dist(dissolved) else None
+    return node.dist
+
+
+def written_branches(tree, merge: RootMerge | None) -> Iterator[tuple[object, str | None, float | None]]:
     """Yield (node, label, length) for every branch that is written.
 
     The dissolved child of the root is not written, and the kept child has the
-    merged label and the summed length.
+    merged label and the summed length. The length is None for a branch that
+    had no length in the input.
     """
     for node in tree:
         if node.up is None or (merge is not None and node.idx == merge.dissolved):
             continue
-        if merge is not None and node.idx == merge.kept:
-            yield node, merge.label, node.dist + tree[merge.dissolved].dist
-        else:
-            yield node, treeio.node_label(node), node.dist
+        label = merge.label if merge is not None and node.idx == merge.kept else treeio.node_label(node)
+        yield node, label, branch_length(tree, node, merge)
 
 
 def internal_texts(
@@ -275,13 +289,13 @@ class TreeWriter(Writer):
                     issues.append(Issue(ERROR, "label-name", f"label {label!r} {problem}", locus))
 
         if write_dists(tree, ctx):
-            nan = [node.idx for node, _, dist in written_branches(tree, merge) if dist != dist]
+            nan = [node.idx for node, _, dist in written_branches(tree, merge) if dist is not None and dist != dist]
             if nan:
                 issues.append(Issue(ERROR, "branch-length", f"{len(nan)} branch lengths are not numbers", locus))
             elif self.sanitizer == "hyphy":
                 short = [
                     node for node, label, dist in written_branches(tree, merge)
-                    if label and not node.is_leaf() and dist <= ctx.short_len
+                    if label and not node.is_leaf() and dist is not None and dist <= ctx.short_len
                 ]
                 if short:
                     issues.append(Issue(
@@ -376,7 +390,6 @@ class TableWriter(Writer):
         merge = plan.merge if plan else None
         ids = row_ids(tree)
         cols = self.columns(ctx)
-        has_dists = treeio.has_dists(tree)
 
         # tip names below every node, in tree order, cut at TIPS_SHOWN
         tips: dict[int, list[str]] = {}
@@ -401,7 +414,7 @@ class TableWriter(Writer):
             dissolved = merge is not None and node.idx == merge.dissolved
             kept = merge is not None and node.idx == merge.kept
             label = merge.label if kept else treeio.node_label(node)
-            dist = node.dist + (tree[merge.dissolved].dist if kept else 0.0)
+            dist = branch_length(tree, node, merge)
             support = getattr(node, "support", None)
             written_name = ""
             if plan is not None:
@@ -426,7 +439,7 @@ class TableWriter(Writer):
                 "label": label or "",
                 "kind": ctx.kinds.get(node.idx, ""),
                 "source": ctx.sources.get(node.idx, ""),
-                "dist": ("%.12g" % dist) if has_dists else "",
+                "dist": ("%.12g" % dist) if dist is not None else "",
                 "support": ("%.12g" % support) if support is not None and support == support else "",
                 "written_name": written_name,
                 "written": "no" if dissolved else "yes",

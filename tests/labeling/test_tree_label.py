@@ -250,6 +250,20 @@ class TestOutputs:
         _, out, _ = run(f"-i {tree} -L Test ^[AB]$ --no-dists")
         assert out == "((A{Test},B{Test}){Test},(C,D),E);\n"
 
+    def test_lengths_that_the_input_did_not_have_are_not_invented(self, run, tmp_path):
+        # an ASTRAL species tree has internal lengths only, and every tip was written with toytree's 1.0
+        tree = tmp_path / "astral.nwk"
+        tree.write_text("(O,((M1,(A,(B,C)1:0.5)0.9:0.3)1:1.2,(M2,(D,E)1:0.8)1:0.4));")
+        code, out, err = run(f"-i {tree} -L Test ^[ABDE]$ --rule fitch -F hyphy")
+        assert code == 0, err
+        assert out == "(O,(M1,(A{Test},(B{Test},C){Test}:0.5){Test}:0.3):1.2,(M2,(D{Test},E{Test}){Test}:0.8):0.4);\n"
+        table = tmp_path / "t.tsv"
+        run(f"-i {tree} -B {table}")
+        assert {row["node"]: row["dist"] for row in table_of(table.read_text())}["A"] == ""
+        tree.write_text("((A,B),C):0;")
+        _, out, _ = run(f"-i {tree}")
+        assert out == "((A,B),C);\n"
+
     def test_keep_root_writes_the_tree_rooted(self, run):
         _, out, _ = run(STEP_1 + " -F hyphy --keep-root")
         assert out == LABELED + "\n"

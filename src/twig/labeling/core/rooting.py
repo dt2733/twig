@@ -27,7 +27,7 @@ from dataclasses import dataclass
 
 from twig.utils import TwigError
 from twig.labeling.core import treeio
-from twig.labeling.core.constants import ROOT_EDGE_POLICIES
+from twig.labeling.core.constants import HAS_DIST, LABEL, ROOT_EDGE_POLICIES
 from twig.labeling.core.model import RootMerge
 from twig.labeling.core.sanitize import label_name_problem
 
@@ -291,7 +291,8 @@ def root_on(tree, target_idx: int, policy: str = "unlabel") -> tuple["object", l
     root with two children, their branches become one, and the label of that
     branch is chosen by the policy before the tree is rerooted. Otherwise
     toytree would keep the label of one of them, chosen by the order of the
-    children.
+    children. The merged branch has the summed length, and no length if either
+    of the two had none in the input.
     """
     out = treeio.copy_tree(tree)
     target = out[target_idx]
@@ -312,9 +313,13 @@ def root_on(tree, target_idx: int, policy: str = "unlabel") -> tuple["object", l
             )
         # toytree keeps the branch of one child and replaces the label of the other while rerooting
         near.label = far.label = label
+        # the merged branch has a length only if both of its halves had one
+        if not (treeio.has_dist(near) and treeio.has_dist(far)):
+            setattr(near, HAS_DIST, False)
+            setattr(far, HAS_DIST, False)
     named = _named_branches(out)
     with treeio.deep_recursion(out):
-        rooted = out.root(target.idx, edge_features=["label"], inplace=True)
+        rooted = out.root(target.idx, edge_features=[LABEL, HAS_DIST], inplace=True)
     treeio.ensure_labels(rooted)
     notes += _restore_names(rooted, named)
     return treeio.carry_over_dists(tree, rooted), notes

@@ -49,6 +49,17 @@ class TestRoundTrip:
         assert all(n.dist == 1.0 for n in tree if not n.is_root())      # what toytree fills in
         assert ":" not in to_newick(tree, dists=treeio.has_dists(tree))
 
+    def test_branches_without_a_length_in_the_input_are_written_without_one(self):
+        # toytree gave them 1.0, which was written as if it had been read
+        assert write("(O,((M1,(A,(B,C)1:0.5)0.9:0.3)1:1.2,(M2,(D,E)1:0.8)1:0.4));") == "(O,((M1,(A,(B,C):0.5):0.3):1.2,(M2,(D,E):0.8):0.4));"
+        assert write("((A,B:2):1,C);") == "((A,B:2):1,C);"
+
+    def test_a_merged_root_branch_has_a_length_only_if_both_halves_had_one(self):
+        tree = treeio.read_tree("(A,(B:2,C:3):4);")
+        assert to_newick(tree, root_merge=root_merge(tree, None)) == "(A,B:2,C:3);"
+        tree = treeio.read_tree("(A:1,(B:2,C:3):4);")
+        assert to_newick(tree, root_merge=root_merge(tree, None)) == "(A:5,B:2,C:3);"
+
     def test_lengths_are_formatted_compactly(self):
         assert write("(A:1.0,B:0.123456789012345);") == "(A:1,B:0.123456789012);"
         assert to_newick(treeio.read_tree("(A:0.5,B:0.25);"), dist_fmt="%.3f") == "(A:0.500,B:0.250);"

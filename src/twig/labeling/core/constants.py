@@ -11,6 +11,9 @@ from __future__ import annotations
 # node feature that stores the label of the branch above a node
 LABEL = "label"
 
+# node feature that is False when the input gave no length for the branch above a node
+HAS_DIST = "has_dist"
+
 # default regular expression that turns a file name into a locus name
 DEFAULT_LOCUS_REGEX = r"^([^.]+)"
 

@@ -35,7 +35,7 @@ from typing import TYPE_CHECKING
 from loguru import logger
 
 from twig.utils import TwigError
-from twig.labeling.core.constants import LABEL, LABEL_SYNTAXES
+from twig.labeling.core.constants import HAS_DIST, LABEL, LABEL_SYNTAXES
 
 if TYPE_CHECKING:  # pragma: no cover
     from toytree import ToyTree
@@ -333,6 +333,7 @@ class _Rewrite:
     labels: list[str]
     syntaxes: set[str]
     has_dists: bool
+    given: list[bool]       # whether each node had a length, in the order the nodes end, which is postorder
 
 
 def _split_pairs(body: str, delim: str) -> list[str]:
@@ -389,7 +390,8 @@ def _rewrite(newick: str, label_syntax: str) -> _Rewrite:
     out: list[str] = []
     in_node_part = 0     # annotations seen on the current node or edge
     on_branch = 0        # labels seen on the current branch, before and after its length
-    has_dists = False
+    given: list[bool] = []
+    colon = False        # the current node has a length
 
     def slot(label: str) -> int:
         if label not in index:
@@ -426,7 +428,9 @@ def _rewrite(newick: str, label_syntax: str) -> _Rewrite:
             in_node_part = 0
             if token != ":":
                 on_branch = 0
-            has_dists = has_dists or token == ":"
+            if token in ",);":
+                given.append(colon)
+            colon = token == ":"
             out.append(token)
         elif kind == "text":
             if "'" in token or '"' in token:
@@ -484,7 +488,9 @@ def _rewrite(newick: str, label_syntax: str) -> _Rewrite:
         )
     if not newick.rstrip().endswith(";"):
         out.append(";")
-    return _Rewrite("".join(out), table, syntaxes, has_dists)
+        given.append(colon)
+    # the root is the last node to end, and its length is not a branch
+    return _Rewrite("".join(out), table, syntaxes, any(given[:-1]), given)
 
 
 ###########################################################################
@@ -581,6 +587,25 @@ def _table_labels(tree: "ToyTree", labels: list[str]) -> None:
         node.label = None if number is None else labels[number]
 
 
+def _mark_missing_dists(tree: "ToyTree", rewritten: _Rewrite, source: str) -> None:
+    """Mark the branches that had no length in a tree that has lengths elsewhere.
+
+    toytree gives such branches a length of 1.0, so they are marked with the
+    edge feature `has_dist` set to False, and the writers leave them without a
+    length. The feature is an edge feature so that it follows its branch when
+    the tree is rerooted.
+    """
+    tree.edge_features.add(HAS_DIST)
+    if not rewritten.has_dists or all(rewritten.given[:-1]):
+        return
+    nodes = list(tree.traverse("postorder"))
+    if len(nodes) != len(rewritten.given):
+        raise TwigError(f"{source}: cannot tell which branches of the tree have lengths")
+    for node, given in zip(nodes, rewritten.given):
+        if not given and node.up is not None:
+            setattr(node, HAS_DIST, False)
+
+
 def _stored_number(value, node) -> int:
     """Return the number that the rewrite stored on a node, or raise if toytree changed it."""
     try:
@@ -623,6 +648,7 @@ def parse_newick(
     for feature in (_TMP_LABEL, _TMP_PAML, _TMP_CLADE):
         tree.edge_features.discard(feature)
     tree.edge_features.add(LABEL)
+    _mark_missing_dists(tree, rewritten, source)
     tree._twig_has_dists = rewritten.has_dists
     return ParsedTree(tree, syntax, rewritten.has_dists, root_label)
 
@@ -687,6 +713,11 @@ def node_label(node) -> str | None:
 def has_dists(tree: "ToyTree") -> bool:
     """Return True unless the tree was read from Newick without branch lengths."""
     return getattr(tree, "_twig_has_dists", True)
+
+
+def has_dist(node) -> bool:
+    """Return False if the input gave no length for the branch above a node."""
+    return getattr(node, HAS_DIST, True) is not False
 
 
 def carry_over_dists(old: "ToyTree", new: "ToyTree") -> "ToyTree":

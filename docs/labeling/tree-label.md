@@ -538,7 +538,7 @@ twig tree-label -i root-edges.nwk -F hyphy --root-edges Z
 (O{Z}:2,(M1{R}:1,(A{T}:1,(B{T}:1,C{V}:1){T}:1){S}:1){R}:1,(M2{R}:1,(D{T}:1,E{T}:1){W}:1){R}:1);
 ```
 
-The joined branch has the summed length of the two branches. For the `outgroup` and `ingroup` values the side of the outgroup is the one that contains the outgroup that `-r` used for rooting, and without `-r` it is the smaller side. If the two sides are equally large, twig asks you to give `-r`. The option `--keep-root` skips the joining and writes the tree as it is, which is useful for programs that read rooted trees.
+The joined branch has the summed length of the two branches, or no length if either of them had none in the input. For the `outgroup` and `ingroup` values the side of the outgroup is the one that contains the outgroup that `-r` used for rooting, and without `-r` it is the smaller side. If the two sides are equally large, twig asks you to give `-r`. The option `--keep-root` skips the joining and writes the tree as it is, which is useful for programs that read rooted trees.
 
 The option `-r` roots the tree on an outgroup before any label is applied. Give tips or species, joined by commas for a clade, and the first outgroup that forms one side of a branch is used. Labels and the names of internal branches stay on their branches when the tree is rerooted. The two old root branches become one branch, and its label is chosen by the same `--root-edges` value, whatever the order in which the two branches are written. The joined branch keeps the name of one of the two, and a name whose branch was joined with a tip or with a branch that has a name of its own is dropped with a warning. An unrooted tree can be rooted in this way, and it should be, because every rule except `tips` decides by the tips that lie below a branch, which depend on the root. When the root has three or more children, every label whose rule is not `tips` gives a warning that suggests `-r`.
 
@@ -561,7 +561,7 @@ The option `-F` chooses the output format.
 | `newick` | a plain tree with the labels removed |
 | `table` | one row per branch, described below |
 
-Branch lengths are written when the input had them, and `--no-dists` leaves them out. A tree that was read without branch lengths is written without them. Internal node names are not written by default. The option `--internal-names` can write the support values (`support`), the names the tree had (`keep`), or new names `twn1`, `twn2` and so on in postorder (`auto`). The new names let the per-branch results of HyPhy be joined to the branch table.
+Branch lengths are written when the input had them, and `--no-dists` leaves them out. A tree that was read without branch lengths is written without them, and so is a branch that had no length in the input, such as a tip of an ASTRAL species tree, which has lengths only on its internal branches. Internal node names are not written by default. The option `--internal-names` can write the support values (`support`), the names the tree had (`keep`), or new names `twn1`, `twn2` and so on in postorder (`auto`). The new names let the per-branch results of HyPhy be joined to the branch table.
 
 For the `hyphy` format twig makes every tip name safe in the way HyPhy would. Characters other than letters, digits and underscores become underscores, and a name that HyPhy reserves gets an underscore added. Names that become equal, without regard to case, stop the run with a list, or get `_2`, `_3` and so on when `--sanitize-suffix` is given. The option `--names-table` saves the table of original and written names. The names are made safe once for all the trees of the input, so a sample is written with the same name in every tree. Label names must start with a letter, contain only letters, digits and underscores, and differ from the HyPhy branch sets All, Internal, Leaves, Unlabeled and fg and from the words that twig uses for mask actions and branch statuses.
 
@@ -591,7 +591,7 @@ The option `-B` writes a table with one row per branch next to the tree, and `-F
 | `label` | the label as written |
 | `kind` | tip, stem, crown (a labeled branch with the same label as its parent, or below a stem of its label) or internal |
 | `source` | where the label came from, which is the label and rule such as `Test:fitch`, or existing, stem, loss, ambiguous, background, or nothing if unlabeled |
-| `dist` | the branch length as written |
+| `dist` | the branch length as written, or nothing for a branch without a length |
 | `support` | the support value of the node, if it has one |
 | `written_name` | the name written for the node |
 | `written` | no for the root child that is dissolved when the root branches are joined |

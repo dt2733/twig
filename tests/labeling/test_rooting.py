@@ -235,6 +235,23 @@ class TestRootOn:
         assert sum(n.dist for n in rooted) == pytest.approx(21)
         assert treeio.has_dists(rooted)
 
+    def test_branches_without_a_length_keep_none_when_rerooting(self):
+        from twig.labeling.core.newick import to_newick
+        tree = treeio.read_tree("(O,((M1,(A,(B,C):0.5):0.3):1.2,(M2,(D,E):0.8):0.4));")
+        d = next(n for n in tree if n.name == "D")
+        rooted, _ = rooting.root_on(tree, d.idx)
+        # the two halves of D's branch have no length, and neither has the merged branch of O and the ingroup
+        assert to_newick(rooted) == "(D,(E,(M2,((M1,(A,(B,C):0.5):0.3):1.2,O):0.4):0.8));"
+        bc = next(n for n in tree if sorted(l.name for l in n.iter_leaves()) == ["B", "C"])
+        rooted, _ = rooting.root_on(tree, bc.idx)
+        assert to_newick(rooted) == "((B,C):0.25,(A,(M1,((M2,(D,E):0.8):0.4,O):1.2):0.3):0.25);"
+
+    def test_the_merged_root_branch_has_a_length_when_both_halves_had_one(self):
+        from twig.labeling.core.newick import to_newick
+        tree = treeio.read_tree("(O:1,((M1,(A,B):0.3):1.2,(M2,(D,E):0.8):0.4):2);")
+        d = next(n for n in tree if n.name == "D")
+        assert to_newick(rooting.root_on(tree, d.idx)[0]) == "(D,(E,(M2,((M1,(A,B):0.3):1.2,O:3):0.4):0.8));"
+
     def test_rooting_where_the_tree_is_already_rooted_changes_nothing(self):
         tree = treeio.read_tree(DISTINCT)
         o = next(n for n in tree if n.name == "O")

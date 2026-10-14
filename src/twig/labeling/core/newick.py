@@ -19,6 +19,7 @@ from collections.abc import Callable
 from twig.utils import TwigError
 from twig.labeling.core.constants import LABEL
 from twig.labeling.core.model import RootMerge
+from twig.labeling.core.treeio import has_dist
 
 # characters that cannot appear in an unquoted Newick name
 _BAD_NAME = re.compile(r"[()\[\]{},:;'\"\s]")
@@ -76,13 +77,15 @@ def to_newick(
         such as `{Test}`. The default is the HyPhy form.
     dists: bool
         Write branch lengths. Trees read without lengths should be written
-        without them, since toytree fills in 1.0 for missing lengths.
+        without them, since toytree fills in 1.0 for missing lengths, and a
+        branch whose length was missing in the input is written without one.
     dist_fmt: str
         Format string for branch lengths.
     root_merge: RootMerge
         Write the tree as unrooted. The `dissolved` child of the root is
         removed and its children move up to the root, and the `kept` child is
-        written with the merged label and the summed branch length.
+        written with the merged label and the summed branch length, or without
+        a length if either of the two had none.
     """
     root = tree.treenode
     dissolved = kept = None
@@ -106,7 +109,7 @@ def to_newick(
             return ""
         label = root_merge.label if node is kept else getattr(node, LABEL, None)
         text = label_text(label)
-        if dists:
+        if dists and has_dist(node) and (node is not kept or has_dist(dissolved)):
             dist = node.dist + (dissolved.dist if node is kept else 0.0)
             if dist != dist:
                 raise TwigError(f"branch length of node {node.idx} is NaN")
