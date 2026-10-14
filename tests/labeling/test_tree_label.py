@@ -347,6 +347,19 @@ class TestExistingLabels:
         assert code == 0 and out == "((A{T},B{T}),C,D);\n"
         assert "ignoring the label 'X' on the root" in err
 
+    def test_stems_act_on_labels_already_in_the_tree(self, run, tmp_path):
+        tree = tmp_path / "t.nwk"
+        tree.write_text("(O,((M1,(A{Test},(B{Test},C){Test}){Test}),(M2,(D{Test},E{Test}){Test})));")
+        code, out, err = run(f"-i {tree} --stems Stem")
+        assert code == 0, err
+        assert out == "(O,((M1,(A{Test},(B{Test},C){Test}){Stem}),(M2,(D{Test},E{Test}){Stem})));\n"
+        assert "--stems treats 2 branches labeled in the input tree as stems (A+B+C, D+E)" in err
+        _, out, _ = run(f"-i {tree} --stems unlabel --background Reference")
+        assert out == (
+            "(O{Reference},((M1{Reference},(A{Test},(B{Test},C{Reference}){Test})){Reference},"
+            "(M2{Reference},(D{Test},E{Test})){Reference}){Reference});\n"
+        )
+
     def test_paml_labels_are_read_and_named(self, run, tmp_path):
         tree = tmp_path / "t.nwk"
         tree.write_text("(A #1,B,(C,D) #2);")

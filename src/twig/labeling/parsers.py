@@ -377,6 +377,11 @@ $ twig tree-label -i paml.nwk --paml-codes 1=Test 2=Reference
 $ twig tree-label -i old.nwk -F newick
 ((A,B),(C,D),E);
 
+# --stems acts on the labels already in a tree too, which makes the stem variant of a tree labeled elsewhere
+$ echo '(O,((A{Test},B{Test}){Test},C));' > test.nwk
+$ twig tree-label -i test.nwk --stems Stem
+(O,((A{Test},B{Test}){Stem},C));
+
 Rooting and writing
 -------------------
 # -r roots the tree on an outgroup first (tips joined by commas make a clade)
@@ -492,7 +497,7 @@ def get_parser_tree_label(parser: ArgumentParser | None = None) -> ArgumentParse
     select.add_argument("--exact", action="store_true", help="treat the names given on the command line as exact names, so that A does not also match MA")
     select.add_argument("--invert", action="store_true", help="label the tips that are not chosen")
     select.add_argument("--leaf-nodes", type=str, metavar="str", choices=LEAF_NODE_CHOICES, default="label", help="label the tips as usual, or remove the labels of tips after the rule has run (" + ", ".join(LEAF_NODE_CHOICES) + ") [%(default)s]")
-    select.add_argument("--stems", type=str, metavar="str", default="keep", help="a stem is the branch on which a trait arose, where its label begins (with fitch a branch with a gain, with crown the branch the rule leaves out at the base of each group). Choose keep, unlabel, or a label name, which gives stems a label of their own [%(default)s]")
+    select.add_argument("--stems", type=str, metavar="str", default="keep", help="a stem is the branch on which a trait arose, where its label begins (with fitch a branch with a gain, with crown the branch the rule leaves out at the base of each group). Choose keep, unlabel, or a label name, which gives stems a label of their own. Labels that are already in the tree count too [%(default)s]")
     select.add_argument("--losses", type=str, metavar="str", default="keep", help="a loss is a branch where parsimony puts the loss of the trait again. Choose keep, unlabel, or a label name, which gives losses a label of their own [%(default)s]")
     select.add_argument("--background", type=str, metavar="str", help="the label given to every branch that is still free after everything else")
     select.add_argument("--precedence", type=str, metavar="str", choices=PRECEDENCE_CHOICES, default="specific", help="which label wins a branch that two labels claim (" + ", ".join(PRECEDENCE_CHOICES) + "). specific lets a label chosen directly for a tip beat one that spreads from a clade, first and last let the earlier or later label win, and error stops [%(default)s]")

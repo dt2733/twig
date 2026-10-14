@@ -33,6 +33,7 @@ from pathlib import Path
 
 from twig.utils import TwigError
 from twig.labeling.core.constants import DEFAULT_NUISANCE_LABEL, PRECEDENCE_CHOICES
+from twig.labeling.core.display import clade_text
 from twig.labeling.core.parsimony import to_fraction
 from twig.labeling.core.rules import AMBIGUOUS_MODES, RULES, RuleInput, make_options, resolve_rule
 from twig.labeling.core.sanitize import check_label_names
@@ -275,17 +276,20 @@ def check_settings(sets: Sequence[LabelSet], config: LabelingConfig) -> None:
 def _find_stems(
     tree,
     sets: Sequence[LabelSet],
+    config: LabelingConfig,
     labels: dict[int, str | None],
     winner_set: dict[int, int | None],
     found_stems: Sequence[frozenset[int] | None],
+    warnings: list[str],
 ) -> dict[int, str]:
     """Return {idx: label} for the internal branches on which a label begins.
 
     A stem is the branch on which a trait arose. The rules fitch and crown say
-    where that is. For the other rules a labeled branch is a stem when its
+    where that is. For the other rules, and for the labels kept from the input
+    tree when the stems switch is not keep, a labeled branch is a stem when its
     parent branch carries another label, and a branch below the root is a stem
-    unless every child of the root carries its label. Nuisance labels, labels
-    kept from the input tree and ambiguous branches are never stems.
+    unless every child of the root carries its label. Nuisance labels and
+    ambiguous branches are never stems.
     """
     root = tree.treenode
 
@@ -307,6 +311,26 @@ def _find_stems(
             and labels.get(idx) and not tree[idx].is_leaf() and starts_label(idx)
         ):
             stem_label[idx] = labels[idx]
+
+    # labels kept from the input tree count only when --stems is asked to act,
+    # and the labels that this run gives to the background, to losses and to
+    # nuisance species are not traits
+    if config.stems != "keep":
+        not_traits = {config.background, config.losses} | {item.name for item in sets if item.nuisance}
+        kept = {
+            idx for idx, number in winner_set.items()
+            if number is None and labels.get(idx) and labels[idx] not in not_traits
+            and not tree[idx].is_leaf() and idx not in stem_label and starts_label(idx)
+        }
+        if kept:
+            text = clade_text(tree)
+            ordered = [node.idx for node in tree.traverse("preorder") if node.idx in kept]
+            shown = ", ".join(text[idx] for idx in ordered[:5]) + (" ..." if len(kept) > 5 else "")
+            what = "1 branch labeled in the input tree as a stem" if len(kept) == 1 else f"{len(kept)} branches labeled in the input tree as stems"
+            warnings.append(
+                f"--stems treats {what} ({shown}), which is right only if those labels mark a trait whose stems were not handled before"
+            )
+            stem_label.update({idx: labels[idx] for idx in kept})
     return stem_label
 
 
@@ -439,7 +463,7 @@ def apply_label_sets(
 
     # stems are the internal branches on which a label begins, and stem_label
     # gives the label that begins on each
-    stem_label = _find_stems(tree, sets, labels, winner_set, found_stems)
+    stem_label = _find_stems(tree, sets, config, labels, winner_set, found_stems, warnings)
     stems = set(stem_label)
 
     kind: dict[int, str] = {}

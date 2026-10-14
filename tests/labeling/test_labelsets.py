@@ -193,6 +193,38 @@ class TestStems:
         assert by_name(tree, result)["AB"] == "Stem"
 
 
+class TestStemsOfLabelsInTheTree:
+    TEST_ONLY = "(O,((M1,(A{Test},(B{Test},C)BC{Test})ABC{Test})X,(M2,(D{Test},E{Test})DE{Test})Y)I)R;"
+
+    def test_stems_act_on_labels_kept_from_the_input_tree(self):
+        # --stems used to do nothing to labels that the tree already had
+        tree = fresh(self.TEST_ONLY)
+        result = apply_label_sets(tree, [], cfg(stems="Stem"))
+        labels = by_name(tree, result)
+        assert labels["ABC"] == labels["DE"] == "Stem" and labels["BC"] == "Test"
+        assert any("--stems treats 2 branches labeled in the input tree as stems (A+B+C, D+E)" in w for w in result.warnings)
+        result = apply_label_sets(tree, [], cfg(stems="unlabel", background="Reference"))
+        labels = by_name(tree, result)
+        assert labels["ABC"] is None and labels["DE"] is None and labels["X"] == "Reference" and labels["BC"] == "Test"
+
+    def test_labels_in_the_tree_are_left_alone_with_keep_or_clear(self):
+        tree = fresh(self.TEST_ONLY)
+        result = apply_label_sets(tree, [], cfg())
+        assert by_name(tree, result)["ABC"] == "Test" and not result.warnings and result.counts["stems"] == 0
+        result = apply_label_sets(tree, [exact("A", "B", rule="all")], cfg(stems="Stem", existing="clear"))
+        assert by_name(tree, result)["DE"] is None and not result.warnings
+
+    def test_labels_that_the_run_gives_to_the_background_are_not_traits(self):
+        # the loss clade below ABC carries the background label of an earlier run
+        tree = fresh("(O{Ref},((A{Test},(B{Ref},C{Ref})BC{Ref})ABC{Test},D{Ref})X{Ref})R;")
+        result = apply_label_sets(tree, [], cfg(stems="Stem", background="Ref"))
+        labels = by_name(tree, result)
+        assert labels["BC"] == "Ref" and labels["ABC"] == "Stem"
+        result = apply_label_sets(tree, [], cfg(stems="Stem"))
+        assert by_name(tree, result)["BC"] == "Stem"      # without --background, Ref looks like a trait, and the warning says so
+        assert any("A+B+C, B+C" in w for w in result.warnings)
+
+
 ###########################################################################
 # nuisance species
 ###########################################################################

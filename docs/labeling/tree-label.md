@@ -63,7 +63,7 @@ Selection:
   --invert                         label the tips that are not chosen
   --leaf-nodes str                 label the tips as usual, or remove the labels of tips after the rule has run (label, skip) [label]
   --stems str                      a stem is the branch on which a trait arose, where its label begins (with fitch a branch with a gain, with crown the branch the rule leaves out at the base of each group). Choose keep,
-                                   unlabel, or a label name, which gives stems a label of their own [keep]
+                                   unlabel, or a label name, which gives stems a label of their own. Labels that are already in the tree count too [keep]
   --losses str                     a loss is a branch where parsimony puts the loss of the trait again. Choose keep, unlabel, or a label name, which gives losses a label of their own [keep]
   --background str                 the label given to every branch that is still free after everything else
   --precedence str                 which label wins a branch that two labels claim (specific, first, last, error). specific lets a label chosen directly for a tip beat one that spreads from a clade, first and last let
@@ -319,6 +319,11 @@ $ twig tree-label -i paml.nwk --paml-codes 1=Test 2=Reference
 $ twig tree-label -i old.nwk -F newick
 ((A,B),(C,D),E);
 
+# --stems acts on the labels already in a tree too, which makes the stem variant of a tree labeled elsewhere
+$ echo '(O,((A{Test},B{Test}){Test},C));' > test.nwk
+$ twig tree-label -i test.nwk --stems Stem
+(O,((A{Test},B{Test}){Stem},C));
+
 Rooting and writing
 -------------------
 # -r roots the tree on an outgroup first (tips joined by commas make a clade)
@@ -397,7 +402,7 @@ Repeat `-L` for more labels. Each label can have its own rule, which is written 
 
 When two labels claim the same branch, `--precedence` decides. The default `specific` lets a label that a tip received by direct selection beat a label that a branch inherits from the clade around it, so a species that you select for its own label is never overwritten by the label of its clade. The value `first` lets earlier labels win, as HyPhy does, `last` lets later labels win, and `error` stops the run.
 
-Labels that are already in the tree are kept by default and have priority over new labels, as in HyPhy. The option `--existing clear` removes them first. If you give no label at all, the labels in the tree are kept, so `tree-label` can also be used only to convert a labeled tree to another format.
+Labels that are already in the tree are kept by default and have priority over new labels, as in HyPhy. The option `--existing clear` removes them first. If you give no label at all, the labels in the tree are kept, so `tree-label` can also be used only to convert a labeled tree to another format, or to apply `--stems` and `--background` to it.
 
 ## Rules
 
@@ -455,9 +460,9 @@ twig tree-label -i species.nwk -L Test dioecious.txt --rule fitch --ambiguous de
 
 These three switches work with every rule and turn the result of a rule into the labeling that your question needs.
 
-A stem is the internal branch on which a trait arose, so the change happened somewhere along its length. How it is found depends on the rule. With `fitch` a stem is a branch with a gain, which means the trait is present on it and absent in its parent, so a branch below the root is a stem only when the root lacks the trait. With `crown` a stem is the branch that the rule leaves out at the base of each group, so `--stems Stem` labels it, the background never takes it, and the first crown branch below it is not a stem. With the other rules a stem is a labeled internal branch whose parent branch does not carry the same label, and a branch below the root is a stem unless every child of the root carries the same label. A tip is never a stem, and neither is a branch with the label of `--ambiguous`. The option `--stems unlabel` leaves stems out of both the test and the reference set, and a name such as `--stems Stem` gives them a class of their own. With a class of their own, one labeled species tree supports both an analysis of the crown only and an analysis of stem plus crown, because the choice can be made later for each run.
+A stem is the internal branch on which a trait arose, so the change happened somewhere along its length. How it is found depends on the rule. With `fitch` a stem is a branch with a gain, which means the trait is present on it and absent in its parent, so a branch below the root is a stem only when the root lacks the trait. With `crown` a stem is the branch that the rule leaves out at the base of each group, so `--stems Stem` labels it, the background never takes it, and the first crown branch below it is not a stem. With the other rules a stem is a labeled internal branch whose parent branch does not carry the same label, and a branch below the root is a stem unless every child of the root carries the same label. A tip is never a stem, and neither is a branch with the label of `--ambiguous`. When `--stems` is unlabel or a name, the labels that are already in the tree count as well, as with the rules other than `fitch` and `crown`, so a tree labeled elsewhere, such as a PAML tree, can be turned into its crown or stem variant. twig cannot tell whether such a label marks a trait or whether its stems were handled before, so it names the stems it finds among them in a warning. The labels that the same run gives to the background, to losses and to nuisance species are never taken for traits. Use this on a tree whose stems have not been handled yet, because on the output of `--stems unlabel` the branch below each old stem would become a new stem. The option `--stems unlabel` leaves stems out of both the test and the reference set, and a name such as `--stems Stem` gives them a class of their own. With a class of their own, one labeled species tree supports both an analysis of the crown only and an analysis of stem plus crown, because the choice can be made later for each run.
 
-A loss is a branch with the trait absent whose parent has it present, which is a reversion to the ancestral state. Only parsimony finds losses. The option `--losses unlabel` leaves them unlabeled, and `--losses Rev` gives them the label Rev. You do not need to know which species are reversions, because any species can be set aside as a nuisance species, as described in the next section.
+A loss is a branch with the trait absent whose parent has it present, which is a reversion to the ancestral state. Only parsimony finds losses, so `--losses` acts on the result of `fitch` and not on labels that are already in the tree. The option `--losses unlabel` leaves them unlabeled, and `--losses Rev` gives them the label Rev. You do not need to know which species are reversions, because any species can be set aside as a nuisance species, as described in the next section.
 
 The option `--background Reference` gives the label Reference to every branch that no label covers, except the stems, losses, ambiguous branches and skipped tips that you deliberately left unlabeled. This makes the reference branches explicit.
 
