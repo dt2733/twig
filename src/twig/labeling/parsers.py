@@ -62,7 +62,7 @@ def add_taxon_mapping_args(parser: ArgumentParser, unmapped: bool = True) -> Non
     exclusive.add_argument("-x", "--name-regex", type=str, metavar="str", help="regex with (?P<species>...) and optional (?P<specimen>...)")
     group.add_argument("-di", "--delim-idxs", type=int, metavar="int", nargs="+", default=[0], help="token indices kept after splitting [0]")
     group.add_argument("-dj", "--delim-join", type=str, metavar="str", help="join string for kept tokens [same as --delim]")
-    group.add_argument("-N", "--normalize", type=str, metavar="str", nargs="+", choices=NORMALIZE_CHOICES, default=list(DEFAULT_NORMALIZE), help="normalization steps used for matching, or none [" + " ".join(DEFAULT_NORMALIZE) + "]")
+    group.add_argument("-N", "--normalize", type=str, metavar="str", nargs="+", choices=NORMALIZE_CHOICES, default=list(DEFAULT_NORMALIZE), help="normalization steps used for matching, or none. The steps given replace the default list rather than adding to it [" + " ".join(DEFAULT_NORMALIZE) + "]")
     group.add_argument("--accept-inferred", action="store_true", help="accept genus-abbreviation matches")
     if unmapped:
         group.add_argument("-U", "--unmapped", type=str, metavar="str", choices=UNMAPPED_POLICIES, default="error", help="what to do with names that cannot be resolved (error, skip, drop, ignore) [%(default)s]")

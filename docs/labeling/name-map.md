@@ -45,7 +45,7 @@ Taxon Mapping:
   -x, --name-regex str             regex with (?P<species>...) and optional (?P<specimen>...)
   -di, --delim-idxs int [int ...]  token indices kept after splitting [0]
   -dj, --delim-join str            join string for kept tokens [same as --delim]
-  -N, --normalize str [str ...]    normalization steps used for matching, or none [accents camel sep case]
+  -N, --normalize str [str ...]    normalization steps used for matching, or none. The steps given replace the default list rather than adding to it [accents camel sep case]
   --accept-inferred                accept genus-abbreviation matches
 
 Reporting:
@@ -102,7 +102,7 @@ Normalization is used only to compare names. The names that are written to the t
 | `sep` | every run of characters that are not letters or digits becomes one `_` | `A.pumilus-s1` becomes `A_pumilus_s1` |
 | `case` | upper case letters become lower case | `Amaranthus_Pumilus` becomes `amaranthus_pumilus` |
 
-The default is `accents camel sep case`, and `-N none` turns normalization off, so that only `exact` matches can succeed.
+The default is `accents camel sep case`. The steps given to `-N` replace this list rather than adding to it, so `-N digits` alone switches off the other four steps, and adding `digits` to the default takes `-N accents camel digits sep case`. The value `-N none` turns normalization off, so that upper and lower case and accents must agree. Names are still split into words at every character that is not a letter or a digit, so `token` and `abbrev` matches still work, and `Beta_vulgaris_s1` still resolves to `Beta_vulgaris` by `token`.
 
 ## Reading the table
 

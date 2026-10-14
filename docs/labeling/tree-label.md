@@ -86,7 +86,7 @@ Taxon Mapping:
   -x, --name-regex str             regex with (?P<species>...) and optional (?P<specimen>...)
   -di, --delim-idxs int [int ...]  token indices kept after splitting [0]
   -dj, --delim-join str            join string for kept tokens [same as --delim]
-  -N, --normalize str [str ...]    normalization steps used for matching, or none [accents camel sep case]
+  -N, --normalize str [str ...]    normalization steps used for matching, or none. The steps given replace the default list rather than adding to it [accents camel sep case]
   --accept-inferred                accept genus-abbreviation matches
 
 Output Format:

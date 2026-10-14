@@ -194,10 +194,24 @@ class TestMatching:
     def test_tokens_must_be_contiguous(self, mapper):
         assert mapper.resolve("Amaranthus_x_pumilus").status == "unmapped"
 
-    def test_without_normalization_only_exact_names_match(self):
+    def test_without_normalization_case_matters_but_words_still_match(self):
+        # the page used to say that only exact names match with -N none
         mapper = NameMapper(vocabulary=SPECIES, normalize=["none"])
         assert mapper.resolve("Beta_vulgaris").status == "ok"
         assert mapper.resolve("beta_vulgaris").status == "unmapped"
+        assert mapper.resolve("BetaVulgaris").status == "unmapped"
+        hits = [mapper.resolve(n) for n in ("Beta_vulgaris_s1", "S012-Beta-vulgaris", "B_vulgaris")]
+        assert [(h.species, h.method, h.status) for h in hits] == [
+            ("Beta_vulgaris", "token", "ok"), ("Beta_vulgaris", "token", "ok"), ("Beta_vulgaris", "abbrev", "inferred"),
+        ]
+
+    def test_steps_given_replace_the_default_steps(self):
+        # -N digits alone switches off case folding and the other default steps, as the help says
+        mapper = NameMapper(vocabulary=SPECIES, normalize=["digits"])
+        assert mapper.steps == ("digits",)
+        assert mapper.resolve("beta_vulgaris").status == "unmapped"
+        mapper = NameMapper(vocabulary=SPECIES, normalize=["accents", "camel", "digits", "sep", "case"])
+        assert mapper.resolve("beta_vulgaris").status == "ok" and mapper.resolve("Beta_vulgaris2").leftover == ("2",)
 
     def test_species_with_the_same_canonical_form_are_ambiguous_when_not_exact(self):
         vocab = Vocabulary(["A_b", "A-b"])
