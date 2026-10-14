@@ -554,7 +554,7 @@ twig tree-label -i species.unrooted.nwk -r O -L Test dioecious.txt --rule fitch 
 
 ## Writing the tree
 
-The option `-F` chooses the output format.
+The tree goes to stdout, or to the file given to `-o`. An existing file is overwritten only with `-f`, and an output is never written over the input tree or over a path that is not a regular file, such as a directory or a device like `/dev/stdout`, even with `-f`. The option `-F` chooses the output format.
 
 | format | output |
 |---|---|

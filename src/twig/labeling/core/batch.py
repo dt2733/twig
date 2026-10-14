@@ -283,23 +283,41 @@ def write_stdout(text: str) -> None:
 
 
 def check_writable(path: str | Path, force: bool = False) -> None:
-    """Raise a TwigError if path exists and overwriting was not requested."""
-    if Path(path).exists() and not force:
-        raise TwigError(f"output path exists, use --force to overwrite: {path}")
+    """Raise a TwigError if path cannot be replaced by a new output file.
+
+    An existing regular file is replaced only if overwriting was requested.
+    Anything else that exists, such as a directory or a device like
+    /dev/stdout, is never replaced, because outputs are written to a temporary
+    file that is renamed over the path, which would turn a device into a file.
+    """
+    path = Path(path)
+    if not path.exists():
+        return
+    if not path.is_file():
+        kind = "a directory" if path.is_dir() else "a device, a pipe or a socket"
+        raise TwigError(
+            f"cannot write to {path}, which is {kind} and not a regular file, so it is never replaced, "
+            "even with --force. Give the path of a file, and leave out -o to write to stdout"
+        )
+    if not force:
+        raise TwigError(f"output path {path} exists, use --force to overwrite it")
 
 
 def atomic_write(path: str | Path, data: str | bytes, force: bool = False) -> None:
     """Write data to path through a temporary file that is renamed when done."""
     path = Path(path)
     check_writable(path, force)
-    path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(path.name + ".tmp")
     mode = "wb" if isinstance(data, bytes) else "w"
     kwargs = {} if isinstance(data, bytes) else {"encoding": "utf-8"}
     try:
+        path.parent.mkdir(parents=True, exist_ok=True)
         with open(tmp, mode, **kwargs) as out:
             out.write(data)
         os.replace(tmp, path)
+    except OSError as exc:
+        tmp.unlink(missing_ok=True)
+        raise TwigError(f"cannot write {path} ({exc})") from exc
     except BaseException:
         tmp.unlink(missing_ok=True)
         raise

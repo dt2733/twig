@@ -101,6 +101,27 @@ class TestOutputs:
         code, _, _ = run_twig(f"name-map {inputs} -o {out_path} -f")
         assert code == 0 and out_path.read_text().startswith("name\tspecies")
 
+    def test_an_output_that_is_a_directory_is_a_clear_error(self, run_twig, inputs, tmp_path):
+        folder = tmp_path / "names"
+        folder.mkdir()
+        for option in ("-o", "--freeze"):
+            code, _, err = run_twig(f"name-map {inputs} {option} {folder} -f")
+            assert code == 1 and "is a directory and not a regular file" in err and "Traceback" not in err
+        assert folder.is_dir() and list(folder.iterdir()) == []
+
+    def test_an_output_that_is_an_input_is_refused_even_with_force(self, run_twig, names_dir, tmp_path):
+        tree = tmp_path / "OG1.treefile"
+        tree.write_text("(Beta_vulgaris,Spinacia_oleracea);\n")
+        species = tmp_path / "species.nwk"
+        species.write_text("(Beta_vulgaris,Spinacia_oleracea);\n")
+        mapping = tmp_path / "map.tsv"
+        mapping.write_text("Beta_vulgaris\n")
+        for option, path in (("-o", tree), ("--freeze", species), ("--freeze", mapping), ("-o", mapping)):
+            before = path.read_text()
+            code, _, err = run_twig(f"name-map -i {tmp_path} -s {species} -I {mapping} {option} {path} -f")
+            assert code == 1 and "is also an input file, so it is not overwritten" in err, (option, path)
+            assert path.read_text() == before
+
     def test_out_and_freeze_must_differ(self, run_twig, inputs, tmp_path):
         path = tmp_path / "same.tsv"
         code, _, err = run_twig(f"name-map {inputs} -o {path} --freeze {path}")

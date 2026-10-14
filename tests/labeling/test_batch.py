@@ -238,10 +238,38 @@ class TestAtomicWrite:
             raise OSError("disk full")
 
         monkeypatch.setattr(batch.os, "replace", boom)
-        with pytest.raises(OSError):
+        with pytest.raises(TwigError, match=r"cannot write .*out.txt \(disk full\)"):
             batch.atomic_write(path, "new", force=True)
         assert path.read_text() == "old"
         assert os.listdir(tmp_path) == ["out.txt"]
+
+    def test_a_directory_is_never_replaced(self, tmp_path):
+        folder = tmp_path / "out"
+        folder.mkdir()
+        with pytest.raises(TwigError, match="is a directory and not a regular file, so it is never replaced, even with --force"):
+            batch.atomic_write(folder, "text", force=True)
+        assert folder.is_dir() and os.listdir(tmp_path) == ["out"]
+
+    @pytest.mark.skipif(not hasattr(os, "mkfifo"), reason="needs named pipes")
+    def test_a_device_or_a_link_to_one_is_never_replaced(self, tmp_path):
+        # with --force a device such as /dev/null used to be renamed over and become a regular file
+        pipe = tmp_path / "pipe"
+        os.mkfifo(pipe)
+        link = tmp_path / "null"
+        link.symlink_to(os.devnull)
+        for path in (pipe, link):
+            with pytest.raises(TwigError, match="is a device, a pipe or a socket and not a regular file"):
+                batch.atomic_write(path, "text", force=True)
+        assert not pipe.is_file() and link.is_symlink() and os.readlink(link) == os.devnull
+        assert sorted(os.listdir(tmp_path)) == ["null", "pipe"]
+
+    def test_a_link_to_a_regular_file_can_be_overwritten(self, tmp_path):
+        target = tmp_path / "target.txt"
+        target.write_text("old")
+        link = tmp_path / "link.txt"
+        link.symlink_to(target)
+        batch.atomic_write(link, "new", force=True)
+        assert link.read_text() == "new"
 
 
 class TestWriteStdout:

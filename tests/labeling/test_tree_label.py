@@ -1,5 +1,7 @@
 """Tests for the tree-label command (twig.labeling.tree_label)."""
 
+import os
+
 import pytest
 
 pytest.importorskip("toytree")
@@ -204,6 +206,21 @@ class TestOutputs:
         tree.write_text(SPECIES)
         code, _, err = run(f"-i {tree} -L Test A -o {tree} -f")
         assert code == 1 and "same as the input file" in err and tree.read_text() == SPECIES
+
+    def test_an_output_that_is_not_a_regular_file_is_refused_even_with_force(self, run, tmp_path):
+        folder = tmp_path / "folder"
+        folder.mkdir()
+        link = tmp_path / "null"
+        link.symlink_to(os.devnull)
+        for option in ("-o", "-B"):
+            for path in (folder, link):
+                code, out, err = run(f"{STEP_1} {option} {path} -f")
+                assert code == 1 and "not a regular file, so it is never replaced" in err, (option, path)
+                assert out == "" and "Traceback" not in err
+        assert folder.is_dir() and link.is_symlink() and sorted(p.name for p in tmp_path.iterdir()) == ["folder", "null"]
+        # without -o the tree still goes to stdout
+        code, out, _ = run(STEP_1)
+        assert code == 0 and out == LABELED + "\n"
 
     def test_plain_newick_has_no_labels(self, run):
         _, out, _ = run(STEP_1 + " -F newick")

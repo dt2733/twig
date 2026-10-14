@@ -85,6 +85,19 @@ def _shown(items: list[str], limit: int = SHOWN) -> str:
     return text + f" and {len(items) - limit} more" if len(items) > limit else text
 
 
+def check_outputs(args) -> None:
+    """Raise a TwigError if an output exists, is given twice, or is one of the input files."""
+    outputs = [p for p in (args.out, args.freeze) if p]
+    if args.out and args.freeze and Path(args.out).resolve() == Path(args.freeze).resolve():
+        raise TwigError("--out and --freeze must be different files")
+    inputs = {p.resolve() for p in batch.expand_inputs(args.input)}
+    inputs.update(Path(p).resolve() for p in (args.sptree, args.vocab, args.imap) if p)
+    for path in outputs:
+        if Path(path).resolve() in inputs:
+            raise TwigError(f"the output file {path} is also an input file, so it is not overwritten, even with --force")
+        batch.check_writable(path, args.force)
+
+
 def needs_attention(hit: NameHit) -> bool:
     """Return True if a name is unresolved, inferred, or has leftover words."""
     return hit.status != "ok" or any(i.isalpha() for i in hit.leftover)
@@ -151,11 +164,7 @@ def run_name_map(args) -> None:
     set_log_level(args.log_level)
     logger.info("CMD: " + " ".join(sys.argv))
 
-    for path in (args.out, args.freeze):
-        if path:
-            batch.check_writable(path, args.force)
-    if args.out and args.freeze and Path(args.out).resolve() == Path(args.freeze).resolve():
-        raise TwigError("--out and --freeze must be different files")
+    check_outputs(args)
 
     vocabulary = None
     if args.sptree:

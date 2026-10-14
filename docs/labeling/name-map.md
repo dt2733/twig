@@ -250,7 +250,7 @@ Running the same command again with the map file leaves only the names you have 
 twig name-map -i trees aln -s species.nwk -I names.tsv --show problems
 ```
 
-An existing output file is never overwritten unless you pass `-f`.
+An existing output file is never overwritten unless you pass `-f`. Even with `-f` an output is never written over one of the input files, the species tree, the species list or the map file, and never over a path that is not a regular file, such as a directory or a device like `/dev/stdout`. The table goes to stdout when `-o` is left out.
 
 ## Strict mode
 
