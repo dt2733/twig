@@ -349,6 +349,16 @@ class TestRootEdgesAndRooting:
             _, out, _ = run(f"-i {tree} -r C -L Test ^A$ -F hyphy")
             assert out == "(C{Ref}:1,D:1,(A{Test}:1,B:1):5);\n"
 
+    def test_internal_names_stay_on_their_branches_when_rerooting(self, run, tmp_path):
+        # Z named the branch of Y after rerooting, and Y the tip branch of M2
+        code, out, err = run(f"-i {NAMED} -r M2 --internal-names keep -L Test:stem ^[DE]$")
+        assert code == 0 and out == "(M2,((D,E)DE{Test},((M1,(A,(B,C)BC)ABC)X,O)Y));\n"
+        assert "the internal name Z is dropped, because its branch at the old root was joined with the branch of O" in err
+        table = tmp_path / "t.tsv"
+        run(f"-i {NAMED} -r M2 -B {table}")
+        rows = {row["node"]: row["tips"] for row in table_of(table.read_text())}
+        assert rows["Y"] == "M1;A;B;C;O" and rows["X"] == "M1;A;B;C" and "Z" not in rows
+
 
 class TestExistingLabels:
     def test_existing_labels_are_kept_by_default(self, run, tmp_path):

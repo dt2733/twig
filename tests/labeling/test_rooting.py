@@ -224,6 +224,47 @@ class TestRootOn:
         assert all(hasattr(n, "label") for n in rooted) and "label" in rooted.edge_features
 
 
+def internal_names(tree):
+    """Return {name: tips below, joined by commas} for the named internal branches of a tree."""
+    below = rooting.tip_name_sets(tree)
+    return {n.name: ",".join(sorted(below[n.idx])) for n in tree if not n.is_leaf() and n.up is not None and n.name}
+
+
+class TestRootOnKeepsInternalNames:
+    def test_names_stay_on_their_branches(self):
+        # toytree left the names on their nodes, so Z named the branch of Y and Y the tip branch of M2
+        tree = treeio.read_tree("(O,((M1,(A,(B,C)BC)ABC)X,(M2,(D,E)DE)Y)Z);")
+        m2 = next(n for n in tree if n.name == "M2")
+        rooted, notes = rooting.root_on(tree, m2.idx)
+        # Y named the side M2, D, E of its branch and now names the other side
+        assert internal_names(rooted) == {"BC": "B,C", "ABC": "A,B,C", "X": "A,B,C,M1", "DE": "D,E", "Y": "A,B,C,M1,O"}
+        assert notes == ["the internal name Z is dropped, because its branch at the old root was joined with the branch of O"]
+
+    @pytest.mark.parametrize("target, kept, dropped", [("A", "Y", "X"), ("B", "Y", "X"), ("C", "X", "Y"), ("D", "X", "Y")])
+    def test_one_name_is_kept_when_both_old_root_branches_have_one(self, target, kept, dropped):
+        for newick in ("((A,B)X,(C,D)Y);", "((C,D)Y,(A,B)X);"):
+            tree = treeio.read_tree(newick)
+            node = next(n for n in tree if n.name == target)
+            rooted, notes = rooting.root_on(tree, node.idx)
+            assert internal_names(rooted) == {kept: "C,D" if kept == "Y" else "A,B"}
+            assert notes == [
+                f"the internal name {dropped} is dropped, because its branch at the old root was joined with the branch of {kept}"
+            ]
+
+    def test_names_of_an_unrooted_tree_follow_their_branches(self):
+        tree = treeio.read_tree("((A,B)X,(C,D)Y,E);")
+        a = next(n for n in tree if n.name == "A")
+        rooted, notes = rooting.root_on(tree, a.idx)
+        assert internal_names(rooted) == {"X": "C,D,E", "Y": "C,D"} and notes == []
+
+    def test_labels_and_names_move_together(self):
+        tree = treeio.read_tree("(O,((M1,(A,(B,C)BC{T})ABC)X{R},(M2,(D,E)DE)Y{S})Z);")
+        e = next(n for n in tree if n.name == "E")
+        rooted, _ = rooting.root_on(tree, e.idx)
+        assert {n.name: n.label for n in rooted if not n.is_leaf() and n.up is not None and n.name} == {
+            "BC": "T", "ABC": None, "X": "R", "DE": None, "Y": "S"}
+
+
 class TestReroot:
     def test_roots_on_a_clade_and_says_which_side_it_is(self):
         tree = treeio.read_tree(DISTINCT)

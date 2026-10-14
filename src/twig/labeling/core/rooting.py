@@ -176,13 +176,73 @@ def _side_of(node, root):
     return node
 
 
+def _tips_below(tree) -> dict[int, frozenset[int]]:
+    """Return the ids of the tip objects below every node.
+
+    Unlike idx these stay the same when a tree is rerooted in place, and unlike
+    names they differ for tips that share a name.
+    """
+    below: dict[int, frozenset[int]] = {}
+    for node in tree:
+        if node.is_leaf():
+            below[node.idx] = frozenset({id(node)})
+        else:
+            below[node.idx] = frozenset().union(*(below[c.idx] for c in node.children))
+    return below
+
+
+def _named_branches(tree) -> list[tuple[frozenset[int], str]]:
+    """Return (tips below, name) for every internal branch that has a name."""
+    named = [n for n in tree if not n.is_leaf() and n.up is not None and n.name]
+    if not named:
+        return []
+    below = _tips_below(tree)
+    return [(below[n.idx], n.name) for n in named]
+
+
+def _restore_names(tree, named: list[tuple[frozenset[int], str]]) -> list[str]:
+    """Give each internal name back to the branch it named, and return notes on names that are dropped.
+
+    toytree leaves names on their nodes when it reroots, so on the path to the
+    new root every name would move to the next branch. A branch is found by the
+    tips on one side of it. The two old root branches are now one, so a name of
+    one of them is dropped if the other is a tip or has a name of its own.
+    """
+    if not named:
+        return []
+    below = _tips_below(tree)
+    everything = below[tree.treenode.idx]
+    by_tips = {below[n.idx]: n for n in tree if n.up is not None}
+    for node in tree:
+        if not node.is_leaf() and node.up is not None:
+            node.name = ""
+    # a branch that still has the same tips below it takes its name first
+    late = []
+    for tips, name in named:
+        node = by_tips.get(tips)
+        if node is not None and not node.is_leaf():
+            node.name = name
+        else:
+            late.append((tips, name))
+    notes = []
+    for tips, name in late:
+        node = by_tips.get(everything - tips)
+        if node is not None and not node.is_leaf() and not node.name:
+            node.name = name
+            continue
+        where = f"the branch of {node.name}" if node is not None and node.name else "another branch"
+        notes.append(f"the internal name {name} is dropped, because its branch at the old root was joined with {where}")
+    return notes
+
+
 def root_on(tree, target_idx: int, policy: str = "unlabel") -> tuple["object", list[str]]:
     """Return a copy of the tree rooted on the branch above a node, and notes.
 
-    Labels stay on their branches. If the tree already had a root with two
-    children, their branches become one, and the label of that branch is chosen
-    by the policy before the tree is rerooted. Otherwise toytree would keep the
-    label of one of them, chosen by the order of the children.
+    Labels and internal names stay on their branches. If the tree already had a
+    root with two children, their branches become one, and the label of that
+    branch is chosen by the policy before the tree is rerooted. Otherwise
+    toytree would keep the label of one of them, chosen by the order of the
+    children.
     """
     out = treeio.copy_tree(tree)
     target = out[target_idx]
@@ -203,9 +263,11 @@ def root_on(tree, target_idx: int, policy: str = "unlabel") -> tuple["object", l
             )
         # toytree keeps the branch of one child and replaces the label of the other while rerooting
         near.label = far.label = label
+    named = _named_branches(out)
     with treeio.deep_recursion(out):
-        rooted = out.root(target.idx, edge_features=["label"])
+        rooted = out.root(target.idx, edge_features=["label"], inplace=True)
     treeio.ensure_labels(rooted)
+    notes += _restore_names(rooted, named)
     return treeio.carry_over_dists(tree, rooted), notes
 
 
