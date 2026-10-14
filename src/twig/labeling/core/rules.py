@@ -63,13 +63,18 @@ class RuleOutput:
     `labels` maps branches to labels. `direct` is the set of branches labeled
     because their own tip was selected, as opposed to branches labeled because
     of the tips below them. `losses` and `ambiguous` are filled by the
-    parsimony rule only.
+    parsimony rule only. `stems` holds the internal branches on which the
+    label begins, for the rules that know where that is, which are fitch (the
+    branches with a gain) and crown (the branches it leaves out at the base of
+    each group). It is None for the other rules, and the stems are then found
+    from the labels.
     """
     labels: dict[int, str]
     direct: frozenset[int] = frozenset()
     losses: frozenset[int] = frozenset()
     ambiguous: frozenset[int] = frozenset()
     cost: Fraction | None = None
+    stems: frozenset[int] | None = None
 
 
 Rule = Callable[[RuleInput], RuleOutput]
@@ -180,7 +185,9 @@ def rule_crown(inp: RuleInput) -> RuleOutput:
         # tips stay labeled, an internal branch stays only below a labeled branch
         if node.is_leaf() or (not is_root(node.up) and node.up.idx in labeled):
             labels[idx] = label
-    return RuleOutput(labels, direct=frozenset(labels) & inp.selected)
+    # the branches left out are the ones on which each group begins
+    stems = frozenset(idx for idx in labeled if idx not in labels)
+    return RuleOutput(labels, direct=frozenset(labels) & inp.selected, stems=stems)
 
 
 @register_rule("some", "Some descendants", help="every branch with at least one selected descendant tip")
@@ -209,8 +216,11 @@ def rule_fitch(inp: RuleInput) -> RuleOutput:
         node.idx for node in inp.tree
         if not is_root(node) and len(result.state_sets[node.idx]) == 2
     }
+    # a stem is an internal branch with a gain, which is the trait present on
+    # it and absent in its parent. When the history is not resolved, a gain
+    # is possible wherever the parent does not have the trait for certain.
     labels: dict[int, str] = {}
-    losses = set()
+    losses, stems = set(), set()
     for node in inp.tree:
         if is_root(node):
             continue
@@ -218,12 +228,16 @@ def rule_fitch(inp: RuleInput) -> RuleOutput:
         if explicit:
             if result.states[idx] == 1:
                 labels[idx] = inp.label
+                if result.states[parent.idx] == 0 and not node.is_leaf():
+                    stems.add(idx)
             if result.states[idx] == 0 and result.states[parent.idx] == 1:
                 losses.add(idx)
         else:
             sets = result.state_sets
             if sets[idx] == {1}:
                 labels[idx] = inp.label
+                if sets[parent.idx] != {1} and not node.is_leaf():
+                    stems.add(idx)
             elif idx in ambiguous and opts.ambiguous != "unlabel":
                 labels[idx] = opts.ambiguous
             if sets[idx] == {0} and sets[parent.idx] == {1}:
@@ -234,6 +248,7 @@ def rule_fitch(inp: RuleInput) -> RuleOutput:
         losses=frozenset(losses),
         ambiguous=frozenset(ambiguous),
         cost=result.cost,
+        stems=frozenset(stems),
     )
 
 

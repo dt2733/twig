@@ -62,7 +62,8 @@ Selection:
   --exact                          treat the names given on the command line as exact names, so that A does not also match MA
   --invert                         label the tips that are not chosen
   --leaf-nodes str                 label the tips as usual, or remove the labels of tips after the rule has run (label, skip) [label]
-  --stems str                      a stem is a branch where a label begins. Choose keep, unlabel, or a label name, which gives stems a label of their own [keep]
+  --stems str                      a stem is the branch on which a trait arose, where its label begins (with fitch a branch with a gain, with crown the branch the rule leaves out at the base of each group). Choose keep,
+                                   unlabel, or a label name, which gives stems a label of their own [keep]
   --losses str                     a loss is a branch where parsimony puts the loss of the trait again. Choose keep, unlabel, or a label name, which gives losses a label of their own [keep]
   --background str                 the label given to every branch that is still free after everything else
   --precedence str                 which label wins a branch that two labels claim (specific, first, last, error). specific lets a label chosen directly for a tip beat one that spreads from a clade, first and last let
@@ -192,9 +193,10 @@ $ twig tree-label -i sp.nwk -L Test dioecious.txt --rule fitch --unknown C --int
 
 Stems, losses and the background
 --------------------------------
-A stem is a branch where a label begins, here ABC and DE. The change happened
-somewhere along it, so a stem is often best left out of both groups. A loss is a
-branch where the trait is lost again, here C. These switches work with every rule.
+A stem is the branch on which the trait arose, here ABC and DE. The change
+happened somewhere along it, so a stem is often best left out of both groups. A
+loss is a branch where the trait is lost again, here C. These switches work with
+every rule.
 
 # --stems unlabel leaves the stems without a label
 $ twig tree-label -i sp.nwk -L Test dioecious.txt --rule fitch --stems unlabel --internal-names keep
@@ -203,6 +205,10 @@ $ twig tree-label -i sp.nwk -L Test dioecious.txt --rule fitch --stems unlabel -
 # a name gives the stems a label of their own, so a later step can treat them as Test or leave them out
 $ twig tree-label -i sp.nwk -L Test dioecious.txt --rule fitch --stems Stem --internal-names keep
 (O,((M1,(A{Test},(B{Test},C)BC{Test})ABC{Stem})X,(M2,(D{Test},E{Test})DE{Stem})Y)Z);
+
+# with crown the stem is the branch that the rule leaves out at the base of each group, here DE
+$ twig tree-label -i sp.nwk -L Test dioecious.txt --rule crown --stems Stem --internal-names keep
+(O,((M1,(A{Test},(B{Test},C)BC)ABC)X,(M2,(D{Test},E{Test})DE{Stem})Y)Z);
 
 # --losses gives the branches where the trait is lost a label of their own
 $ twig tree-label -i sp.nwk -L Test dioecious.txt --rule fitch --losses Rev --internal-names keep
@@ -449,7 +455,7 @@ twig tree-label -i species.nwk -L Test dioecious.txt --rule fitch --ambiguous de
 
 These three switches work with every rule and turn the result of a rule into the labeling that your question needs.
 
-A stem is a labeled internal branch whose parent branch does not carry the same label. It is the branch on which the label begins, and the change happened somewhere along its length. The option `--stems unlabel` leaves stems out of both the test and the reference set, and a name such as `--stems Stem` gives them a class of their own. With a class of their own, one labeled species tree supports both an analysis of the crown only and an analysis of stem plus crown, because the choice can be made later for each run.
+A stem is the internal branch on which a trait arose, so the change happened somewhere along its length. How it is found depends on the rule. With `fitch` a stem is a branch with a gain, which means the trait is present on it and absent in its parent, so a branch below the root is a stem only when the root lacks the trait. With `crown` a stem is the branch that the rule leaves out at the base of each group, so `--stems Stem` labels it, the background never takes it, and the first crown branch below it is not a stem. With the other rules a stem is a labeled internal branch whose parent branch does not carry the same label, and a branch below the root is a stem unless every child of the root carries the same label. A tip is never a stem, and neither is a branch with the label of `--ambiguous`. The option `--stems unlabel` leaves stems out of both the test and the reference set, and a name such as `--stems Stem` gives them a class of their own. With a class of their own, one labeled species tree supports both an analysis of the crown only and an analysis of stem plus crown, because the choice can be made later for each run.
 
 A loss is a branch with the trait absent whose parent has it present, which is a reversion to the ancestral state. Only parsimony finds losses. The option `--losses unlabel` leaves them unlabeled, and `--losses Rev` gives them the label Rev. You do not need to know which species are reversions, because any species can be set aside as a nuisance species, as described in the next section.
 
@@ -555,8 +561,8 @@ The option `-B` writes a table with one row per branch next to the tree, and `-F
 | `tips` | the names of the tips below the branch, cut after 200 |
 | `species` | the species below the branch, only with `--select-on species` |
 | `label` | the label as written |
-| `kind` | tip, stem, crown (a labeled branch with the same label as its parent) or internal |
-| `source` | where the label came from, which is the label and rule such as `Test:fitch`, or existing, stem, loss, background, or nothing if unlabeled |
+| `kind` | tip, stem, crown (a labeled branch with the same label as its parent, or below a stem of its label) or internal |
+| `source` | where the label came from, which is the label and rule such as `Test:fitch`, or existing, stem, loss, ambiguous, background, or nothing if unlabeled |
 | `dist` | the branch length as written |
 | `support` | the support value of the node, if it has one |
 | `written_name` | the name written for the node |
@@ -590,7 +596,7 @@ S13   7              internal
 
 ## Checking the result
 
-The option `--show` prints one line for every labeled branch to stderr, in the order of the tree, followed by the unlabeled branches. Each line gives the label, the role of the branch and the tips below it, where X+Y means the branch above the common ancestor of X and Y. The roles are tip, stem, loss, crown and internal. The stems that were left without a label are listed as well, so that they are not missed.
+The option `--show` prints one line for every labeled branch to stderr, in the order of the tree, followed by the unlabeled branches. Each line gives the label, the role of the branch and the tips below it, where X+Y means the branch above the common ancestor of X and Y. The roles are tip, stem, loss, ambiguous, crown and internal. The stems that were left without a label are listed as well, so that they are not missed.
 
 ## Step 1 of an analysis
 

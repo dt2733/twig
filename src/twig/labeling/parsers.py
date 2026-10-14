@@ -251,9 +251,10 @@ $ twig tree-label -i sp.nwk -L Test dioecious.txt --rule fitch --unknown C --int
 
 Stems, losses and the background
 --------------------------------
-A stem is a branch where a label begins, here ABC and DE. The change happened
-somewhere along it, so a stem is often best left out of both groups. A loss is a
-branch where the trait is lost again, here C. These switches work with every rule.
+A stem is the branch on which the trait arose, here ABC and DE. The change
+happened somewhere along it, so a stem is often best left out of both groups. A
+loss is a branch where the trait is lost again, here C. These switches work with
+every rule.
 
 # --stems unlabel leaves the stems without a label
 $ twig tree-label -i sp.nwk -L Test dioecious.txt --rule fitch --stems unlabel --internal-names keep
@@ -262,6 +263,10 @@ $ twig tree-label -i sp.nwk -L Test dioecious.txt --rule fitch --stems unlabel -
 # a name gives the stems a label of their own, so a later step can treat them as Test or leave them out
 $ twig tree-label -i sp.nwk -L Test dioecious.txt --rule fitch --stems Stem --internal-names keep
 (O,((M1,(A{Test},(B{Test},C)BC{Test})ABC{Stem})X,(M2,(D{Test},E{Test})DE{Stem})Y)Z);
+
+# with crown the stem is the branch that the rule leaves out at the base of each group, here DE
+$ twig tree-label -i sp.nwk -L Test dioecious.txt --rule crown --stems Stem --internal-names keep
+(O,((M1,(A{Test},(B{Test},C)BC)ABC)X,(M2,(D{Test},E{Test})DE{Stem})Y)Z);
 
 # --losses gives the branches where the trait is lost a label of their own
 $ twig tree-label -i sp.nwk -L Test dioecious.txt --rule fitch --losses Rev --internal-names keep
@@ -487,7 +492,7 @@ def get_parser_tree_label(parser: ArgumentParser | None = None) -> ArgumentParse
     select.add_argument("--exact", action="store_true", help="treat the names given on the command line as exact names, so that A does not also match MA")
     select.add_argument("--invert", action="store_true", help="label the tips that are not chosen")
     select.add_argument("--leaf-nodes", type=str, metavar="str", choices=LEAF_NODE_CHOICES, default="label", help="label the tips as usual, or remove the labels of tips after the rule has run (" + ", ".join(LEAF_NODE_CHOICES) + ") [%(default)s]")
-    select.add_argument("--stems", type=str, metavar="str", default="keep", help="a stem is a branch where a label begins. Choose keep, unlabel, or a label name, which gives stems a label of their own [%(default)s]")
+    select.add_argument("--stems", type=str, metavar="str", default="keep", help="a stem is the branch on which a trait arose, where its label begins (with fitch a branch with a gain, with crown the branch the rule leaves out at the base of each group). Choose keep, unlabel, or a label name, which gives stems a label of their own [%(default)s]")
     select.add_argument("--losses", type=str, metavar="str", default="keep", help="a loss is a branch where parsimony puts the loss of the trait again. Choose keep, unlabel, or a label name, which gives losses a label of their own [%(default)s]")
     select.add_argument("--background", type=str, metavar="str", help="the label given to every branch that is still free after everything else")
     select.add_argument("--precedence", type=str, metavar="str", choices=PRECEDENCE_CHOICES, default="specific", help="which label wins a branch that two labels claim (" + ", ".join(PRECEDENCE_CHOICES) + "). specific lets a label chosen directly for a tip beat one that spreads from a clade, first and last let the earlier or later label win, and error stops [%(default)s]")

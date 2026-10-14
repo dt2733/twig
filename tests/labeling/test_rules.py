@@ -68,6 +68,15 @@ class TestDesignTable:
         assert where(tree, type("R", (), {"labels": dict.fromkeys(out.losses)})) == ["C"]
         assert sorted(tree[i].name for i in out.ambiguous) == ["ABC", "BC"]
 
+    def test_crown_and_fitch_say_where_the_label_begins(self, tree):
+        assert names_of(tree, run(tree, "crown").stems) == ["DE"]
+        assert names_of(tree, run(tree, "fitch").stems) == ["ABC", "DE"]
+        assert names_of(tree, run(tree, "fitch", ambiguous="deltran").stems) == ["DE"]
+        # an ambiguous branch is not a gain for certain, and DE is
+        assert names_of(tree, run(tree, "fitch", ambiguous="Maybe").stems) == ["DE"]
+        for rule in ("tips", "all", "some"):
+            assert run(tree, rule).stems is None, rule
+
     def test_hyphys_parsimony_gives_the_same_as_all_but_fitch_does_not(self, tree):
         # the regression that shows why real parsimony matters
         assert where(tree, run(tree, "all")) == ["A", "B", "D", "DE", "E"]

@@ -40,10 +40,10 @@ def clade_text(tree, species_of: Callable[[str], str] | None = None, limit: int 
 
 
 def role_of(node, kinds: Mapping[int, str], sources: Mapping[int, str]) -> str:
-    """Return the role of a branch, which is tip, stem, loss, crown or internal."""
+    """Return the role of a branch, which is tip, stem, loss, ambiguous, crown or internal."""
     source = sources.get(node.idx, "")
-    if source == "loss":
-        return "loss"
+    if source in ("loss", "ambiguous"):
+        return source
     return kinds.get(node.idx) or ("tip" if node.is_leaf() else "internal")
 
 

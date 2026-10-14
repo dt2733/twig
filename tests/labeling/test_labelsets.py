@@ -136,6 +136,64 @@ class TestDesignExample:
 
 
 ###########################################################################
+# stems, the branches on which a trait arose
+###########################################################################
+
+class TestStems:
+    CROWN = "(O,(M,((D1,D2)D,E)DE)Y)R;"
+
+    def test_with_crown_the_branch_left_out_is_the_stem(self):
+        # the first crown branch D used to be the stem, and the real stem DE got the background label
+        tree = fresh(self.CROWN)
+        sets = [exact("D1", "D2", "E", rule="crown")]
+        result = apply_label_sets(tree, sets, cfg(stems="Stem"))
+        labels, kinds = by_name(tree, result), by_name(tree, result, "kind")
+        assert labels["DE"] == "Stem" and labels["D"] == "Test"
+        assert kinds["DE"] == "stem" and kinds["D"] == "crown"
+        result = apply_label_sets(tree, sets, cfg(stems="unlabel", background="Reference"))
+        labels = by_name(tree, result)
+        assert labels["D"] == "Test" and labels["DE"] is None and labels["Y"] == "Reference"
+        result = apply_label_sets(tree, sets, cfg(background="Reference"))
+        assert by_name(tree, result)["DE"] is None and result.counts["stems"] == 1
+
+    def test_with_crown_on_the_species_tree(self):
+        tree = fresh(NAMED)
+        result = apply_label_sets(tree, [exact(*DIOECIOUS, rule="crown")], cfg(stems="Stem"))
+        assert {k: v for k, v in by_name(tree, result).items() if v} == {
+            "A": "Test", "B": "Test", "D": "Test", "E": "Test", "DE": "Stem"}
+
+    def test_the_label_of_ambiguous_branches_is_not_a_trait_label(self):
+        # ABC, which is only ambiguous, used to become a stem
+        tree = fresh(NAMED)
+        result = apply_label_sets(tree, [exact(*DIOECIOUS)], cfg(ambiguous="Unsure", stems="Stem"))
+        labels = by_name(tree, result)
+        assert labels["ABC"] == labels["BC"] == "Unsure" and labels["DE"] == "Stem"
+        assert by_name(tree, result, "source")["ABC"] == "ambiguous"
+        result = apply_label_sets(tree, [exact(*DIOECIOUS)], cfg(ambiguous="Unsure", stems="unlabel"))
+        labels = by_name(tree, result)
+        assert labels["ABC"] == "Unsure" and labels["DE"] is None and result.counts["stems"] == 1
+
+    def test_with_fitch_a_branch_below_a_root_that_has_the_trait_is_not_a_stem(self):
+        # the root has the trait and C and E lost it, so no gain happens anywhere
+        tree = fresh("((A,B)AB,(C,(D,E)DE)CDE)R;")
+        result = apply_label_sets(tree, [exact("A", "B", "D")], cfg(gain_cost=Fraction(2), stems="unlabel"))
+        labels = by_name(tree, result)
+        assert labels["AB"] == labels["CDE"] == labels["DE"] == "Test" and result.counts["stems"] == 0
+        result = apply_label_sets(tree, [exact("A", "B", "C", "D")], cfg(stems="Stem"))
+        assert by_name(tree, result)["AB"] == by_name(tree, result)["CDE"] == "Test"
+        # with the root fixed to lack the trait, the gains are stems again
+        result = apply_label_sets(tree, [exact("A", "B", "C", "D")], cfg(stems="Stem", root_state="0"))
+        assert by_name(tree, result)["AB"] == "Stem"
+
+    def test_with_other_rules_a_label_on_every_child_of_the_root_has_no_stem_there(self):
+        tree = fresh("((A,B)AB,(C,D)CD)R;")
+        result = apply_label_sets(tree, [exact("A", "B", "C", "D", rule="all")], cfg(stems="Stem"))
+        assert by_name(tree, result)["AB"] == by_name(tree, result)["CD"] == "Test"
+        result = apply_label_sets(tree, [exact("A", "B", rule="all")], cfg(stems="Stem"))
+        assert by_name(tree, result)["AB"] == "Stem"
+
+
+###########################################################################
 # nuisance species
 ###########################################################################
 

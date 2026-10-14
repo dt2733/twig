@@ -153,6 +153,24 @@ class TestTheDesignedAnalysis:
         names = labeled_names(out)
         assert names["ABC"] == names["DE"] == "Stem" and names["BC"] == "Test"
 
+    def test_the_stem_of_crown_is_the_branch_it_leaves_out(self, run):
+        _, out, err = run(f"-i {NAMED} -L Test {DIOECIOUS} --rule crown --stems Stem --background Reference --internal-names keep --show")
+        names = labeled_names(out)
+        assert names["DE"] == "Stem" and names["Y"] == "Reference" and names["D"] == "Test"
+        assert "  Stem       stem      D+E" in err
+
+    def test_an_ambiguous_branch_is_not_a_stem(self, run):
+        _, out, err = run(f"-i {NAMED} -L Test {DIOECIOUS} --rule fitch --ambiguous Unsure --stems Stem --internal-names keep --show")
+        names = labeled_names(out)
+        assert names["ABC"] == names["BC"] == "Unsure" and names["DE"] == "Stem"
+        assert "  Unsure  ambiguous  A+B+C" in err
+
+    def test_no_stem_below_a_root_that_has_the_trait(self, run, tmp_path):
+        tree = tmp_path / "t.nwk"
+        tree.write_text("((A,B)AB,(C,(D,E)DE)CDE);")
+        _, out, _ = run(f"-i {tree} -L Test ^[ABD]$ --rule fitch --gain-cost 2 --stems unlabel --internal-names keep")
+        assert set(labeled_names(out)) == {"A", "B", "AB", "CDE", "D", "DE"}
+
     def test_ambiguous_branches_can_get_their_own_label(self, run):
         _, out, _ = run(f"-i {NAMED} -L Test {DIOECIOUS} --rule fitch --ambiguous Amb --internal-names keep")
         assert {n for n, label in labeled_names(out).items() if label == "Amb"} == {"ABC", "BC"}

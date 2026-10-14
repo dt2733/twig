@@ -272,6 +272,44 @@ def check_settings(sets: Sequence[LabelSet], config: LabelingConfig) -> None:
             )
 
 
+def _find_stems(
+    tree,
+    sets: Sequence[LabelSet],
+    labels: dict[int, str | None],
+    winner_set: dict[int, int | None],
+    found_stems: Sequence[frozenset[int] | None],
+) -> dict[int, str]:
+    """Return {idx: label} for the internal branches on which a label begins.
+
+    A stem is the branch on which a trait arose. The rules fitch and crown say
+    where that is. For the other rules a labeled branch is a stem when its
+    parent branch carries another label, and a branch below the root is a stem
+    unless every child of the root carries its label. Nuisance labels, labels
+    kept from the input tree and ambiguous branches are never stems.
+    """
+    root = tree.treenode
+
+    def starts_label(idx: int) -> bool:
+        node = tree[idx]
+        if node.up is root:
+            return any(labels.get(child.idx) != labels[idx] for child in root.children)
+        return labels.get(node.up.idx) != labels[idx]
+
+    stem_label: dict[int, str] = {}
+    for number, item in enumerate(sets):
+        if not item.nuisance and found_stems[number] is not None:
+            for idx in found_stems[number]:
+                if labels.get(idx) in (None, item.name):
+                    stem_label[idx] = item.name
+    for idx, number in winner_set.items():
+        if (
+            number is not None and not sets[number].nuisance and found_stems[number] is None
+            and labels.get(idx) and not tree[idx].is_leaf() and starts_label(idx)
+        ):
+            stem_label[idx] = labels[idx]
+    return stem_label
+
+
 def apply_label_sets(
     tree,
     sets: Sequence[LabelSet],
@@ -325,6 +363,7 @@ def apply_label_sets(
                 claims[node.idx].append(_Claim(label, (1, 0), "existing", None))
     losses: set[int] = set()
     ambiguous: set[int] = set()
+    found_stems: list[frozenset[int] | None] = []
     for number, (item, chosen) in enumerate(zip(sets, selections)):
         options = make_options(
             gain=item.gain_cost if item.gain_cost is not None else config.gain_cost,
@@ -340,6 +379,7 @@ def apply_label_sets(
         reports[number].claimed = len(out.labels)
         reports[number].cost = out.cost
         losses |= out.losses
+        found_stems.append(out.stems)
         if options.ambiguous == "unlabel":
             ambiguous |= out.ambiguous
         for idx, label in out.labels.items():
@@ -351,7 +391,9 @@ def apply_label_sets(
                 rank = (2, -number)
             else:
                 rank = (2, number)
-            claims[idx].append(_Claim(label, rank, f"{item.name}:{item.rule}", number))
+            # a branch with the label for ambiguous branches is not a trait branch of the set
+            where = "ambiguous" if idx in out.ambiguous and label != item.name else f"{item.name}:{item.rule}"
+            claims[idx].append(_Claim(label, rank, where, number))
 
     # settle the claims
     labels: dict[int, str | None] = {node.idx: None for node in nonroot}
@@ -395,29 +437,29 @@ def apply_label_sets(
                 labels[node.idx], source[node.idx] = None, ""
                 held.add(node.idx)
 
-    # stems are labeled branches of the sets that do not continue a labeled parent
-    regular = {idx for idx in source if labels.get(idx) and from_regular_set(idx)}
-    stems = {
-        idx for idx in regular
-        if not tree[idx].is_leaf() and (tree[idx].up is root or labels.get(tree[idx].up.idx) != labels[idx])
-    }
+    # stems are the internal branches on which a label begins, and stem_label
+    # gives the label that begins on each
+    stem_label = _find_stems(tree, sets, labels, winner_set, found_stems)
+    stems = set(stem_label)
 
     kind: dict[int, str] = {}
     for node in nonroot:
+        label = labels.get(node.idx)
         if node.is_leaf():
             kind[node.idx] = "tip"
         elif node.idx in stems:
             kind[node.idx] = "stem"
-        elif labels.get(node.idx) and node.up is not root and labels.get(node.up.idx) == labels[node.idx]:
+        elif label and node.up is not root and label in (labels.get(node.up.idx), stem_label.get(node.up.idx)):
             kind[node.idx] = "crown"
         else:
             kind[node.idx] = "internal"
 
+    # a stem is never given the background label, whether it is labeled or not
     counts: dict[str, int] = {"stems": len(stems)}
+    held |= stems
     if config.stems == "unlabel":
         for idx in stems:
             labels[idx], source[idx] = None, ""
-        held |= stems
     elif config.stems != "keep":
         for idx in stems:
             labels[idx], source[idx] = config.stems, "stem"

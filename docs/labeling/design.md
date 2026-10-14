@@ -1037,6 +1037,12 @@ Recorded on 2026-10-13, when `tree-label` was built. Where this section differs 
 6. **Root labels.** A label on the root of the input is ignored with a warning. Rerooting joins the two old root branches by the `--root-edges` policy before toytree moves the root, and the branch that the new root cuts keeps its label on both halves.
 7. **Help and examples.** The help of `tree-label` explains each option in plain words and ends with a list of examples that shows every rule and every option on one small tree. The tests run each command and compare its output with the help, and they check that every option has an example. The rule `parsimony` is accepted as a synonym of `fitch`, and the help says what the name means.
 
+## H.8 Decisions made when the review of M1 was fixed
+
+Recorded on 2026-10-14, when the findings of a review of `tree-label` were fixed. Where this section differs from the sections above, this section is what the code does.
+
+1. **Stems.** A stem is the internal branch on which a trait arose, as in the glossary, and not simply a labeled branch whose parent has another label as G.1 says. With `fitch` it is a branch with a gain (state 1 below state 0), so a child of a root in state 1 is not a stem. With `crown` it is the branch that the rule leaves out at the base of each group, so `--stems NAME` labels it, the background never takes it, and the first crown branch is not a stem. With the other rules G.1 applies, and a labeled child of the root is a stem unless every child of the root carries the same label. The label of `--ambiguous` is not a trait label, so an ambiguous branch is never a stem, and its source is `ambiguous`. A stem never gets the background label, whatever `--stems` says.
+
 ---
 
 # Appendix. Notes on existing twig code (not changed by this work)
