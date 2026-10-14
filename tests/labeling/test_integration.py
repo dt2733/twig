@@ -186,6 +186,38 @@ class TestCommandLine:
         assert f"planned for milestone {milestone}" in err and "Traceback" not in err
 
 
+class TestScripts:
+    """Every twig run module can be run as a script, so the labeling modules can too."""
+
+    @pytest.mark.parametrize("name", COMMANDS)
+    def test_each_run_module_prints_its_help(self, name):
+        module = "twig.labeling." + name.replace("-", "_")
+        result = subprocess.run([sys.executable, "-m", module, "-h"], capture_output=True, text=True)
+        assert result.returncode == 0, result.stderr
+        assert result.stdout.startswith(f"usage: {name}")
+
+    def test_a_user_error_is_a_message_and_not_a_traceback(self, tmp_path):
+        result = subprocess.run(
+            [sys.executable, "-m", "twig.labeling.tree_label", "-i", str(tmp_path / "none.nwk")],
+            capture_output=True, text=True,
+        )
+        assert result.returncode == 1 and "ERROR" in result.stderr and "Traceback" not in result.stderr
+
+    def test_a_planned_command_says_so_and_fails_cleanly(self):
+        result = subprocess.run([sys.executable, "-m", "twig.labeling.sample_reduce"], capture_output=True, text=True)
+        assert result.returncode == 1 and "planned for milestone M4" in result.stderr and "Traceback" not in result.stderr
+
+    def test_a_script_does_the_work_like_the_twig_command(self, tmp_path):
+        tree = tmp_path / "t.nwk"
+        tree.write_text("((A,B),(C,D));")
+        result = subprocess.run(
+            [sys.executable, "-m", "twig.labeling.tree_label", "-i", str(tree), "-L", "Test", "^[AB]$", "--rule", "tips", "-l", "ERROR"],
+            capture_output=True, text=True,
+        )
+        assert result.returncode == 0, result.stderr
+        assert result.stdout == "((A{Test},B{Test}),(C,D));\n"
+
+
 class TestConstants:
     def test_status_names_match_the_status_enum(self):
         assert list(constants.STATUS_NAMES) == [s.value for s in Status]

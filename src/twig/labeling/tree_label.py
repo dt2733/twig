@@ -421,3 +421,24 @@ def run_tree_label(args) -> None:
         logger.info(f"wrote {count(len(pieces), 'tree')} to {args.out}")
     else:
         batch.write_stdout(text)
+
+
+def main():
+    """Run tree-label as a script, like the other twig run modules."""
+    from .parsers import get_parser_tree_label
+    args = get_parser_tree_label().parse_args()
+    run_tree_label(args)
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        logger.warning("interrupted by user")
+        sys.exit(1)
+    except TwigError as exc:
+        logger.error(exc)
+        sys.exit(1)
+    except Exception as exc:
+        logger.error(exc)
+        raise

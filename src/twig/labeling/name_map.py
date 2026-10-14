@@ -214,3 +214,24 @@ def run_name_map(args) -> None:
     if args.freeze:
         write_frozen_map(hits, args.freeze, force=args.force)
         logger.info(f"wrote the resolved map to {args.freeze}, use it with -I")
+
+
+def main():
+    """Run name-map as a script, like the other twig run modules."""
+    from .parsers import get_parser_name_map
+    args = get_parser_name_map().parse_args()
+    run_name_map(args)
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        logger.warning("interrupted by user")
+        sys.exit(1)
+    except TwigError as exc:
+        logger.error(exc)
+        sys.exit(1)
+    except Exception as exc:
+        logger.error(exc)
+        raise
