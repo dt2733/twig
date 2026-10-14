@@ -12,7 +12,7 @@ This document is self-contained. Part A gives any reader, human or AI, the backg
 - **Layout.** Code lives in `src/twig/` in subpackages `cli` (the command line), `seqlab` (BLAST, alignment, trimming, concatenation), `treelab` (gene tree tools), `synteny` (genome file formatting), `hgt` (unfinished) and `utils` (logging, errors, a process pool).
 - **How a command runs.** `src/twig/cli/main.py` holds a `DISPATCH` dictionary mapping each subcommand name to a subpackage, for example `"tree-filter": "..treelab"`. At startup `main` builds every subcommand's argument parser by calling `get_parser_<name>` from `src/twig/cli/subcommands.py`. When a command is chosen, it imports `twig.<subpackage>.<name>` lazily and calls `run_<name>(args)`. `TwigError` (from `twig.utils`) is the error type for user mistakes and is printed without a traceback.
 - **Tree engine.** All tree work uses toytree (Deren Eaton's tree library, `toytree>=3.0.10` in `pyproject.toml`). The existing tree tools are `tree-filter`, `tree-rooter` and `tree-skeleton`. They parse sample names into taxon names with `--delim`, `--delim-idxs`, `--delim-join` and an `--imap` file, and that parsing is duplicated across several modules.
-- **State of the code.** There are no tests. Documentation is a mkdocs-material site in `docs/`, deployed by a GitHub Action on pushes to `main`. Several small bugs exist in other tools (listed in the appendix). They are not part of this work.
+- **State of the code.** The rest of twig has no tests, and this work adds `tests/labeling`. Documentation is a mkdocs-material site in `docs/`, deployed by a GitHub Action on pushes to `main`. Several small bugs exist in other tools (listed in the appendix). They are not part of this work.
 - **Why the fork matters.** Keeping existing files untouched keeps it easy to pull future changes from eaton-lab/twig without merge conflicts. Part B is built around that.
 
 ## A.2 The scientific problem
@@ -85,7 +85,7 @@ No new dependencies are added. The code uses the standard library, toytree and l
 | file | change | why it cannot be avoided |
 |---|---|---|
 | `src/twig/cli/main.py` | four lines added to `DISPATCH`, for example `"tree-label": "..labeling",` | `main` only runs subcommands listed there |
-| `src/twig/cli/subcommands.py` | two lines appended at the very end, a comment and `from twig.labeling.parsers import get_parser_name_map, get_parser_sample_reduce, get_parser_tree_label, get_parser_tree_label_transfer  # noqa: E402,F401` | `main` looks up `get_parser_<name>` as attributes of this module. Appending at the end means the module is fully defined before the import runs, so there is no circular-import risk |
+| `src/twig/cli/subcommands.py` | four lines appended at the very end, which are two blank lines, a comment and `from twig.labeling.parsers import get_parser_name_map, get_parser_sample_reduce, get_parser_tree_label, get_parser_tree_label_transfer  # noqa: E402,F401` | `main` looks up `get_parser_<name>` as attributes of this module. Appending at the end means the module is fully defined before the import runs, so there is no circular-import risk |
 | `mkdocs.yml` (optional, only if the user agrees) | one nav block listing `docs/labeling/` pages | without it, mkdocs still builds the pages but leaves them out of the site menu |
 
 Nothing else changes. In particular `pyproject.toml` (setuptools finds the new subpackage automatically), `README.md`, the GitHub workflow, and every file in `utils/`, `treelab/`, `seqlab/`, `synteny/` and `hgt/` stay as they are.
@@ -99,7 +99,7 @@ Only stable infrastructure is imported.
 | `twig.utils.TwigError` | the error type `main` already handles |
 | `twig.utils.logger_setup.set_log_level`, `setup_loguru_worker` | the same logging behavior as every other command |
 | `twig.utils.parallel.run_with_pool_iter`, `safe_popen` | parallel genes, and running external commands with clean Ctrl-C handling |
-| `twig.cli.subcommands.SingleMetavarHelpFormatter` | the same help layout as the newer twig commands, imported inside each `get_parser_*` function |
+| `twig.cli.subcommands.SingleMetavarHelpFormatter` | the same help layout as the newer twig commands, imported inside the `_formatter` helper of `parsers.py`, which every `get_parser_*` function uses |
 
 ## B.4 Logic reimplemented inside `labeling` instead of shared
 
@@ -116,11 +116,11 @@ The duplication is deliberate. A later, separate effort could offer the shared v
 
 ## B.5 Safety rules for living inside twig
 
-1. **Startup cost.** `main` builds every parser on every `twig` call. So `twig/labeling/__init__.py` stays empty and `labeling/parsers.py` imports only `argparse`, `pathlib` and `textwrap`. toytree is imported only inside the four run modules and `labeling/core/`. A test asserts that importing `twig.cli.subcommands` does not load toytree.
+1. **Startup cost.** `main` builds every parser on every `twig` call. So `twig/labeling/__init__.py` stays empty and `labeling/parsers.py` imports only `argparse`, `pathlib`, `textwrap` and `labeling/core/constants.py`, which has no imports. toytree is imported only inside the four run modules and `labeling/core/`. A test asserts that importing `twig.cli.subcommands` does not load toytree.
 2. **Startup failures.** A bug in one of the four `get_parser_*` functions would break every twig command. A test builds the full `twig` parser and runs `twig -h`.
 3. **Flags.** argparse subparsers keep separate option namespaces, so the new commands' flags cannot collide with flags of other commands.
 4. **Names.** The four command names are checked against the current `DISPATCH` and against upstream eaton-lab/twig before they are added.
-5. **Removal.** Removing the feature means deleting the three directories and the six added lines.
+5. **Removal.** Removing the feature means deleting the three directories and the eight added lines, four in `main.py` and four in `subcommands.py`.
 
 ---
 
@@ -238,11 +238,13 @@ src/twig/labeling/
     newick.py              iterative Newick serializer used by every writer
     rooting.py             rooting clades, species-consistent rooting, root-edge merge planning
     rules.py               internal-node rule registry
+    labelsets.py           label sets applied to a tree, with precedence, stems, losses, background and nuisance species
     parsimony.py           two-state Sankoff reconstruction
     transfer.py            SpeciesIndex, restriction to present species, branch classifier
     paralogs.py            duplication detection and policies
     mask.py                mask parsing and application
     sanitize.py            HyPhy and PAML name rules, global reversible name tables, label-name checks
+    textio.py              the one reader of text files, so that every command words a missing or unreadable file alike
     writers.py             writer registry
     presets.py             program presets, requirements and command templates
     validate.py            Issue type, checks for trees, alignments and presets
@@ -512,7 +514,7 @@ HyPhy reads every tree as unrooted. Given a two-child root, it promotes the firs
 class RootMerge:
     dissolved: int; kept: int; labels: tuple[str | None, str | None]; label: str | None; conflict: bool
 
-def plan_root_merge(tree, policy, priority=(), outgroup_side=None) -> RootMerge | None
+def plan_root_merge(tree, policy="unlabel", outgroup_side=None) -> RootMerge | None
 ```
 
 - **Which child is dissolved.** A bifurcating internal root child when one exists, so PAML never gets more than three children at the root.
@@ -570,14 +572,14 @@ def plan_root_merge(tree, policy, priority=(), outgroup_side=None) -> RootMerge 
 @dataclass
 class ParsimonyResult:
     states: dict[int, int]; state_sets: dict[int, frozenset[int]]; cost: Fraction
-def sankoff_binary(tree, tip_states, gain=1, loss=1, root_state="free", tie="deltran") -> ParsimonyResult
+def sankoff_binary(tree, tip_states, gain=1, loss=1, root_state="free", tie="acctran") -> ParsimonyResult
 ```
 
 1. **Tip states.** Selected tips are 1, unselected tips are 0, and tips given with `--unknown` cost nothing in either state. Costs are `--gain-cost` (0 to 1) and `--loss-cost` (1 to 0), stored as `Fraction` so equality tests are exact.
 2. **Downpass** in idx order (children first), `d[v][s] = sum over children w of min over t of (c[s][t] + d[w][t])`. Polytomies are handled exactly.
 3. **Root.** `best = min over s of d[root][s]`. With `--root-state 0|1`, `best = d[root][k]` and the other state gets infinite cost at the root.
 4. **Uppass** gives the state sets of all most-parsimonious reconstructions. State s is in node v's set exactly when `d[v][s] + up[v][s] == best`.
-5. **One reconstruction** is chosen in preorder, with `deltran` (default) delaying changes toward the tips and `acctran` moving them toward the root.
+5. **One reconstruction** is chosen in preorder, with `acctran` (default, see H.7) moving changes toward the root and `deltran` delaying them toward the tips.
 6. **Ambiguous nodes** (`--ambiguous deltran|acctran|unlabel|<NAME>`) follow the chosen reconstruction, stay unlabeled, or get their own label.
 7. **Unrooted input.** The result depends on the root position whatever the costs, so twig warns when the root has three or more children (see H.8).
 
@@ -621,7 +623,7 @@ These switches apply to every rule and turn a reconstruction into exactly the la
 | | `--precedence str` | `specific` | specific, first, last, error |
 | | `--existing str` | `keep` | keep, clear |
 | | `-r, --outgroups str+` | | reroot on these tips or species first |
-| Parsimony | `--ambiguous str` | `deltran` | deltran, acctran, unlabel, or a label |
+| Parsimony | `--ambiguous str` | `acctran` | acctran, deltran, unlabel, or a label |
 | | `--gain-cost`, `--loss-cost float` | `1` | change costs |
 | | `--unknown SEL+` | | tips with unknown state |
 | | `--root-state str` | `free` | free, 0, 1 |
@@ -979,7 +981,7 @@ mkdocs builds these pages without a nav entry. Adding them to the site menu need
 
 | milestone | contents | what the user can do afterwards |
 |---|---|---|
-| M0 foundations | `twig/labeling` skeleton, the six added lines in `main.py` and `subcommands.py`, integration tests, `core/names.py`, `fasta.py`, `selectors.py`, `batch.py`, `treeio.py`, `newick.py`, `sanitize.py`, `twig name-map` | check and freeze the name mapping across every gene |
+| M0 foundations | `twig/labeling` skeleton, the eight added lines in `main.py` and `subcommands.py`, integration tests, `core/names.py`, `fasta.py`, `selectors.py`, `batch.py`, `treeio.py`, `newick.py`, `sanitize.py`, `twig name-map` | check and freeze the name mapping across every gene |
 | M1 tree-label | `rules.py`, `parsimony.py`, stems, losses, background, `--show`, braces, hyphy, newick and table writers, root-edge planning | build and inspect the labeled species tree |
 | M2 transfer core | `SpeciesIndex`, restriction and merges, split and clade matching, rooting, classifier, label masks including prune, alignment pairing and writing, presets relax, busted, busted-ph and absrel, reports, `hyphy_commands.sh`, check, resume | RELAX and BUSTED-PH inputs for all single-copy genes |
 | M3 repeats and paralogs | `--repeats`, intraspecific handling, duplication detection, skip, mask and split policies, status masks | safe runs on multi-individual and multi-copy data |
@@ -1029,7 +1031,7 @@ Recorded on 2026-10-13, after the design document was committed.
 
 Recorded on 2026-10-13, when `tree-label` was built. Where this section differs from the sections above, this section is what the code does.
 
-1. **Tie rule.** The default of `--ambiguous` is `acctran`, not `deltran` as written in G.1. On the species tree the trait can have been gained on the branch above A, B and C and lost on C, or it can have been gained separately on A and on B, and both histories cost 3. The `fitch` row of H.1 and the figure in C.2 show the first history, and only `acctran` produces it. The value `deltran` stays available and labels A, B, D, E and DE. The statement in H.1 that the reconstruction is unique is therefore not right.
+1. **Tie rule.** The default of `--ambiguous` is `acctran`. The first draft of G.1 gave `deltran`, and G.1 now says `acctran`. On the species tree the trait can have been gained on the branch above A, B and C and lost on C, or it can have been gained separately on A and on B, and both histories cost 3. The `fitch` row of H.1 and the figure in C.2 show the first history, and only `acctran` produces it. The value `deltran` stays available and labels A, B, D, E and DE. The statement in H.1 that the reconstruction is unique is therefore not right.
 2. **Nuisance species.** `--nuisance SELECTOR...` and `--nuisance-label NAME` (default `Nuisance`) mark species or clades as nuisance, with the rule `all`. A nuisance label beats every other label, labels already in the tree included. It is not changed by `--stems`, `--losses`, `--leaf-nodes skip` or `--background`, and its tips have an unknown state in parsimony. Tips given with `--unknown` that are not nuisance take the state that parsimony infers for them, and are labeled with it.
 3. **Extra options.** `tree-label` also has `--paml-codes` (names for PAML label numbers), `--sanitize-suffix` and `--names-table` (the table of written tip names), which the table in G.1 does not list.
 4. **Branch table.** The columns of the `tree-label` table are `locus idx node is_tip n_tips tips species label kind source dist support written_name written merged_into note`, where `species` appears only with `--select-on species`. The `tips` column is cut after 200 names. The table describes the tree as it is written, so a dissolved root branch has `written` set to no.

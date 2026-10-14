@@ -4,8 +4,8 @@
 
 Tips are selected by name or species, a rule turns each selection into labeled
 branches, and the trees are written in one of several formats. The usual use is
-to label the species tree once, and the labeled tree is then the input of
-`tree-label-transfer`.
+to label the species tree once. The labeled tree is meant to be the input of
+`tree-label-transfer`, which is planned for milestone M2 and is not available yet.
 
 >>> twig tree-label -i sp.nwk -L Test dioecious.txt --rule fitch --stems unlabel --background Reference --show
 >>> twig tree-label -i sp.nwk -L Test dioecious.txt --rule fitch --nuisance C --background Reference

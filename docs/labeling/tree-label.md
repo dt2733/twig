@@ -1,6 +1,6 @@
 # tree-label
 
-The `twig tree-label` tool labels the branches of a tree from selections of tips. You usually run it once, on your species tree, and the labeled species tree is then the input of `tree-label-transfer`, which copies the labels onto every gene tree. It can also label a single gene tree directly. It writes the result in the form HyPhy reads, as a plain tree, or as a table with one row per branch.
+The `twig tree-label` tool labels the branches of a tree from selections of tips. You usually run it once, on your species tree. The labeled species tree is meant to be the input of `tree-label-transfer`, which will copy its labels onto every gene tree, but that command is planned for milestone M2 and is not available yet. Until then `tree-label` can also label a single gene tree directly from its own tips. It writes the result in the form HyPhy reads, as a plain tree, or as a table with one row per branch.
 
 You choose tips by name, with list files or regular expressions, or by species. A rule then decides which branches get the label. The rules include those of the HyPhy `label-tree` script and real two-state parsimony, which the HyPhy option of that name does not do. Three switches refine the result. Stems can be left unlabeled or given their own label, losses found by parsimony can be left unlabeled or given their own label, and every branch that is still free can get a background label. Species that belong in neither the test set nor the reference set, for any reason, can be set aside as nuisance species.
 
@@ -532,7 +532,7 @@ twig tree-label -i species.nwk -L Test dioecious.txt --rule fitch --stems unlabe
 
 Here C is set aside. Parsimony no longer has to explain it, so the cost of the history falls from 3 to 2, and C keeps its own label. Take care that unknown states can change the history elsewhere. If M1 and M2 were set aside as well, for example, a single gain above the whole ingroup would become the best history and the branches above M1, M2 and the ingroup would be labeled Test.
 
-What a program does with the nuisance label is decided later, for each analysis, when the labels are copied to gene trees. RELAX can set such branches aside, and BUSTED-PH has no such set, so the species must either be removed from the trees and alignments or be accepted as background. That choice belongs to `tree-label-transfer`.
+What a program does with the nuisance label is decided later, for each analysis, when the labels are copied to gene trees. RELAX can set such branches aside, and BUSTED-PH has no such set, so the species must either be removed from the trees and alignments or be accepted as background. That choice will belong to `tree-label-transfer`, which is planned for milestone M2.
 
 ## Rooting and the two branches at the root
 

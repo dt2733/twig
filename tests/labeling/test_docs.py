@@ -223,3 +223,58 @@ class TestTreeLabelExamplesOnThePage:
     def test_the_page_says_what_fitch_means(self):
         text = (DOCS / "tree-label.md").read_text()
         assert "Walter Fitch" in text and "1971" in text and "The rule `parsimony` means the same as `fitch`" in text
+
+
+class TestTransferIsPlanned:
+    """tree-label-transfer does not exist yet, so nothing may describe it as if it did."""
+
+    def test_the_pages_say_it_is_planned_wherever_they_mention_it(self):
+        for page in PAGES:
+            if page.name == "design.md":
+                continue
+            chunks = []
+            for number, line in prose_lines(page.read_text()):
+                if line.strip():
+                    chunks.append(line)
+                else:
+                    chunks.append("\n")
+            for paragraph in "".join(i if i == "\n" else i + " " for i in chunks).split("\n"):
+                if "tree-label-transfer" in paragraph and not paragraph.lstrip().startswith("|"):
+                    assert any(word in paragraph for word in ("planned", "not available yet", "will ")), (page.name, paragraph[:120])
+
+    def test_the_module_docstring_says_it_is_planned(self):
+        import twig.labeling.tree_label as module
+        assert "planned for milestone M2" in module.__doc__
+
+
+class TestDesignMatchesTheCode:
+    """The design is the specification, so where the code differs from it the design must say so."""
+
+    @pytest.fixture
+    def design(self):
+        return (DOCS / "design.md").read_text()
+
+    def test_every_module_is_in_the_layout(self, design):
+        source = Path(__file__).parents[2] / "src" / "twig" / "labeling"
+        layout = design[design.index("## E.1 Module layout"):design.index("## E.2")]
+        for path in sorted(source.glob("*.py")) + sorted((source / "core").glob("*.py")):
+            if path.name != "__init__.py":
+                assert path.name in layout, path.name
+
+    def test_the_default_tie_rule_is_the_one_in_the_code(self, design):
+        from twig.labeling.core.constants import DEFAULT_AMBIGUOUS
+        assert f"| Parsimony | `--ambiguous str` | `{DEFAULT_AMBIGUOUS}` |" in design
+        assert f'tie="{DEFAULT_AMBIGUOUS}") -> ParsimonyResult' in design
+
+    def test_the_signatures_shown_are_the_signatures_of_the_code(self, design):
+        import inspect
+        from twig.labeling.core.parsimony import sankoff_binary
+        from twig.labeling.core.rooting import plan_root_merge
+        for func in (plan_root_merge, sankoff_binary):
+            shown = next(line for line in design.splitlines() if line.startswith(f"def {func.__name__}("))
+            names = [part.split("=")[0].strip() for part in shown[shown.index("(") + 1:shown.rindex(")")].split(",")]
+            assert names == list(inspect.signature(func).parameters), func.__name__
+
+    def test_nothing_says_that_there_are_no_tests(self, design):
+        assert "There are no tests" not in design
+        assert (Path(__file__).parent / "test_docs.py").exists()
