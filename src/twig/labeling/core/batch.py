@@ -40,13 +40,19 @@ _GLOB_CHARS = re.compile(r"[*?\[]")
 # input files
 ###########################################################################
 
+def _listed(name: str) -> bool:
+    """Return False for a hidden file or a temporary file, which directories and globs leave out."""
+    return not name.startswith(".") and not name.endswith(".tmp")
+
+
 def expand_inputs(items: Iterable[str | Path]) -> list[Path]:
     """Return the files named by paths, directories and globs.
 
-    A directory gives its regular files (not hidden, not temporary), a value
-    with glob characters gives its matches, and any other value must be an
-    existing file. Results are sorted within each item and duplicates are
-    dropped, keeping the first occurrence.
+    A directory gives its regular files and a value with glob characters gives
+    the regular files it matches, in both cases without hidden files and the
+    temporary files that `atomic_write` leaves when a run is killed. Any other
+    value must be an existing file. Results are sorted within each item and
+    duplicates are dropped, keeping the first occurrence.
     """
     found: list[Path] = []
     seen: set[Path] = set()
@@ -55,13 +61,15 @@ def expand_inputs(items: Iterable[str | Path]) -> list[Path]:
         if os.path.isdir(text):
             paths = [
                 Path(text) / name for name in sorted(os.listdir(text))
-                if not name.startswith(".") and not name.endswith(".tmp")
-                and os.path.isfile(os.path.join(text, name))
+                if _listed(name) and os.path.isfile(os.path.join(text, name))
             ]
             if not paths:
                 raise TwigError(f"directory {text} contains no files")
         elif _GLOB_CHARS.search(text) and not os.path.exists(text):
-            paths = [Path(i) for i in sorted(glob.glob(text, recursive=True)) if os.path.isfile(i)]
+            paths = [
+                Path(i) for i in sorted(glob.glob(text, recursive=True))
+                if _listed(os.path.basename(i)) and os.path.isfile(i)
+            ]
             if not paths:
                 raise TwigError(f"no files match {text!r}")
         elif os.path.isfile(text):
@@ -78,25 +86,35 @@ def expand_inputs(items: Iterable[str | Path]) -> list[Path]:
 
 _TREE_START = re.compile(r"^(\[[^\]]*\]\s*)*\(")
 _TREE_WITH_LOCUS = re.compile(r"^[^\s(\[;]+\t+(\[[^\]]*\]\s*)*\(")
+_COMMENTS_ONLY = re.compile(r"^(\[[^\]]*\]\s*)+$")
 _PAML_HEADER = re.compile(r"^\d+\s+\d+$")
 
 
 def sniff_kind(path: str | Path) -> str:
-    """Return `fasta`, `tree` or `unknown` from the first lines of a file."""
+    """Return `fasta`, `tree` or `unknown` from the first lines of a file.
+
+    A line of two numbers starts a PAML tree file and also a PHYLIP alignment,
+    so the line after it decides. A line made only of [...] comments is
+    skipped.
+    """
+    header = False
     try:
         with open(path, "r", encoding="utf-8-sig", errors="replace") as data:      # utf-8-sig drops a byte order mark
             for _, line in zip(range(200), data):
                 text = line.strip()
                 if not text:
                     continue
-                if text.upper().startswith("#NEXUS"):
+                if text.upper().startswith("#NEXUS") and not header:
                     return "tree"
-                if text.startswith("#"):
+                if text.startswith("#") or _COMMENTS_ONLY.match(text):
                     continue
-                if text.startswith(">"):
+                if text.startswith(">") and not header:
                     return "fasta"
-                if _TREE_START.match(text) or _TREE_WITH_LOCUS.match(line.lstrip()) or _PAML_HEADER.match(text):
+                if _TREE_START.match(text) or _TREE_WITH_LOCUS.match(line.lstrip()):
                     return "tree"
+                if _PAML_HEADER.match(text) and not header:
+                    header = True
+                    continue
                 return "unknown"
     except OSError as exc:
         raise TwigError(f"cannot read {path}: {exc}") from exc

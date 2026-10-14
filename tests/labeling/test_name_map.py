@@ -255,6 +255,17 @@ class TestInputs:
         code, _, err = run_twig(f"name-map -i {folder}/notes.txt -s {names_dir}/species.nwk")
         assert code == 1 and "neither a tree file nor a FASTA file" in err
 
+    def test_a_phylip_alignment_in_a_directory_is_skipped(self, run_twig, names_dir, tmp_path):
+        # its first line of two numbers looks like the header of a PAML tree file
+        folder = tmp_path / "aln"
+        folder.mkdir()
+        (folder / "OG1.phy").write_text("2 8\nAmaranthus_pumilus ACGTACGT\nBeta_vulgaris ACGTACGT\n")
+        (folder / "OG2.fa").write_text(">Beta_vulgaris\nACGT\n")
+        code, out, err = run_twig(f"name-map -i {folder} -s {names_dir}/species.nwk")
+        assert code == 0, err
+        assert "skipping" in err and "OG1.phy, which is neither a tree file nor a FASTA file" in err
+        assert [r["name"] for r in parse_table(out)] == ["Beta_vulgaris"]
+
     def test_errors(self, run_twig, names_dir, tmp_path):
         sp = f"-s {names_dir}/species.nwk"
         code, _, err = run_twig(f"name-map -i {tmp_path}/missing.nwk {sp}")

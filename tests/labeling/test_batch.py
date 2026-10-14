@@ -34,6 +34,13 @@ class TestExpand:
         found = batch.expand_inputs([files / "trees"])
         assert [p.name for p in found] == ["OG0001.treefile", "OG0002.treefile", "OG0003.treefile"]
 
+    def test_a_glob_leaves_out_hidden_and_temporary_files_like_a_directory(self, files):
+        # the .tmp file is a partial output of a run that was killed
+        found = batch.expand_inputs([str(files / "trees" / "*")])
+        assert [p.name for p in found] == ["OG0001.treefile", "OG0002.treefile", "OG0003.treefile"]
+        with pytest.raises(TwigError, match="no files match"):
+            batch.expand_inputs([str(files / "trees" / "*.tmp")])
+
     def test_files_directories_and_globs_can_be_mixed_and_deduplicated(self, files):
         items = [files / "trees" / "OG0003.treefile", str(files / "trees" / "*.treefile"), files / "aln"]
         found = batch.expand_inputs(items)
@@ -65,6 +72,12 @@ class TestSniff:
         ("[&R] (A,B);\n", "tree"),
         ("OG0001\t(A:1,B:2);\n", "tree"),
         ("3 2\n(A,B,C);\n(A,C,B);\n", "tree"),
+        ("3 2\n\n[&R] (A,B,C);\n", "tree"),
+        ("[&R]\n(A,B);\n", "tree"),
+        ("[a comment] [&R]\n\nOG1\t(A,B);\n", "tree"),
+        ("2 8\nAmaranthus_pumilus ACGTACGT\nBeta_vulgaris ACGTACGT\n", "unknown"),
+        ("  2   8\nA  ACGTACGT\nB  ACGTACGT\n", "unknown"),
+        ("3 2\n", "unknown"),
         ("#NEXUS\nbegin trees;\n", "tree"),
         ("name\tvalue\n", "unknown"),
         ("", "unknown"),

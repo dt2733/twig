@@ -59,7 +59,7 @@ Runtime:
 
 ## Inputs
 
-The input to `-i` is any mix of tree files, FASTA files, directories and globs. Quote globs, as in `'trees/*.treefile'`, so that twig expands them itself, which keeps thousands of files from hitting the argument limit of the shell. A file is recognized as a tree file or a FASTA file from its first lines and not from its extension. A file that is neither is skipped with a warning when it comes from a directory or a glob, and is an error when you name it directly.
+The input to `-i` is any mix of tree files, FASTA files, directories and globs. Quote globs, as in `'trees/*.treefile'`, so that twig expands them itself, which keeps thousands of files from hitting the argument limit of the shell. A file is recognized as a tree file or a FASTA file from its first lines and not from its extension. A file that is neither, such as a PHYLIP alignment, is skipped with a warning when it comes from a directory or a glob, and is an error when you name it directly. Directories and globs leave out hidden files and files whose names end in `.tmp`, which are the partial outputs of a twig run that was killed.
 
 A tree file can hold one tree or many trees, which can span several lines. Blank lines, comment lines that start with `#` and a PAML header with the number of species and trees are skipped. Trees can carry labels, support values, branch lengths and annotations, all of which are ignored here. NEXUS files and quoted names are not supported.
 
