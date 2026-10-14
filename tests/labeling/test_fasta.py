@@ -20,6 +20,8 @@ class TestParse:
         (">\nACGT\n", r"<text>:1: empty FASTA header"),
         ("ACGT\n>a\nAC\n", r"<text>:1: sequence found before any FASTA header"),
         ("\n\n", r"no FASTA records"),
+        (">a\n>b\nACGT\n", r"<text>:1: FASTA record 'a' has no sequence"),
+        (">a\nACGT\n>b\n\n", r"<text>:3: FASTA record 'b' has no sequence"),
     ])
     def test_strict_errors(self, text, message):
         with pytest.raises(TwigError, match=message):
@@ -43,6 +45,26 @@ class TestParse:
         path.write_bytes("\ufeff>a\nACGT\n>b\nAC--\n".encode("utf-8"))
         assert fasta.read_headers(path) == ["a", "b"]
         assert fasta.read_fasta(path) == {"a": "ACGT", "b": "AC--"}
+
+    def test_both_readers_find_the_same_headers(self, tmp_path):
+        # an indented header was a record for read_fasta but invisible to read_headers
+        path = tmp_path / "x.fa"
+        path.write_text(" >a\nAC\n  >b desc\nGT\n")
+        assert fasta.read_fasta(path) == {"a": "AC", "b": "GT"}
+        assert fasta.read_headers(path) == ["a", "b"]
+
+    @pytest.mark.parametrize("text, message", [
+        (">a\n>b\nACGT\n", r"x.fa:1: FASTA record 'a' has no sequence"),
+        (">a\nACGT\n>b\n", r"x.fa:3: FASTA record 'b' has no sequence"),
+        (">a\nACGT\n>b\n\n  \n>c\nAC\n", r"x.fa:3: FASTA record 'b' has no sequence"),
+    ])
+    def test_both_readers_refuse_a_record_without_a_sequence(self, tmp_path, text, message):
+        path = tmp_path / "x.fa"
+        path.write_text(text)
+        with pytest.raises(TwigError, match=message):
+            fasta.read_headers(path)
+        with pytest.raises(TwigError, match=message):
+            fasta.read_fasta(path)
 
     def test_header_scan_errors(self, tmp_path):
         empty = tmp_path / "empty.fa"

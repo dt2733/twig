@@ -3,9 +3,10 @@
 """Strict FASTA reading and writing, and simple alignment and codon checks.
 
 A header is its first whitespace-separated token, and the rest of the header
-line is dropped. The reader is strict about empty and duplicate headers and,
-for alignments, about rows of unequal length. Several other twig tools have
-their own FASTA readers, which are deliberately left unchanged.
+line is dropped. The reader is strict about empty and duplicate headers, about
+records without a sequence and, for alignments, about rows of unequal length.
+Several other twig tools have their own FASTA readers, which are deliberately
+left unchanged.
 
 This module does not import toytree.
 """
@@ -59,10 +60,13 @@ def _read_text(path: str | Path) -> str:
 def parse_fasta(text: str, source: str = "<text>", aligned: bool = False) -> dict[str, str]:
     """Return FASTA records as an ordered dict of {header: sequence}.
 
-    Raises a TwigError for sequence before the first header, empty or
-    duplicate headers, no records, and (if aligned) rows of unequal length.
+    A header line starts with `>`, after any leading whitespace. Raises a
+    TwigError for sequence before the first header, empty or duplicate
+    headers, records without a sequence, no records, and (if aligned) rows of
+    unequal length.
     """
     records: dict[str, list[str]] = {}
+    starts: dict[str, int] = {}
     name = None
     for lineno, raw in enumerate(text.splitlines(), start=1):
         line = raw.strip()
@@ -76,12 +80,16 @@ def parse_fasta(text: str, source: str = "<text>", aligned: bool = False) -> dic
             if name in records:
                 raise TwigError(f"{source}:{lineno}: duplicate FASTA header {name!r}")
             records[name] = []
+            starts[name] = lineno
         else:
             if name is None:
                 raise TwigError(f"{source}:{lineno}: sequence found before any FASTA header")
             records[name].append("".join(line.split()))
     if not records:
         raise TwigError(f"{source}: no FASTA records")
+    for name, lines in records.items():
+        if not lines:
+            raise TwigError(f"{source}:{starts[name]}: FASTA record {name!r} has no sequence")
     seqs = {k: "".join(v) for k, v in records.items()}
     if aligned:
         lengths = {len(s) for s in seqs.values()}
@@ -97,26 +105,38 @@ def read_fasta(path: str | Path, aligned: bool = False) -> dict[str, str]:
 
 
 def read_headers(path: str | Path) -> list[str]:
-    """Return the headers of a FASTA file, in order, without reading sequences.
+    """Return the headers of a FASTA file, in order, without keeping sequences.
 
-    Duplicates are kept, so that callers can report them.
+    Headers are found as in `parse_fasta`, and a record without a sequence is
+    an error there too. Duplicates are kept, so that callers can report them.
     """
     path = Path(path)
     names = []
+    empty = None        # the line of the last header, until a sequence follows it
     try:
         with open(path, "r", encoding="utf-8-sig") as data:
             for lineno, line in enumerate(data, start=1):
+                line = line.strip()
+                if not line:
+                    continue
                 if line.startswith(">"):
+                    if empty is not None:
+                        break
                     fields = line[1:].split()
                     if not fields:
                         raise TwigError(f"{path}:{lineno}: empty FASTA header")
                     names.append(fields[0])
+                    empty = lineno
+                else:
+                    empty = None
     except OSError as exc:
         raise TwigError(f"cannot read {path}: {exc}") from exc
     except UnicodeDecodeError as exc:
         raise TwigError(f"{path} is not valid UTF-8 text") from exc
     if not names:
         raise TwigError(f"{path}: no FASTA records")
+    if empty is not None:
+        raise TwigError(f"{path}:{empty}: FASTA record {names[-1]!r} has no sequence")
     return names
 
 
