@@ -299,6 +299,21 @@ class TestTable:
         abc = next(r for r in rows if r["tips"] == "A;B")
         assert abc["dist"] == "3" and abc["support"] == "95"
 
+    def test_the_species_column_names_every_species_of_a_large_clade(self):
+        # the column was built from the first 200 tip names only, so B and C were missing without a mark
+        names = ",".join(f"A_{i}" for i in range(1, 211))
+        _, rows = self.rows(f"(O_1,((({names}),B_1),C_1));", writer="table", species_of=lambda n: n.split("_")[0])
+        by_size = {int(r["n_tips"]): r["species"] for r in rows}
+        assert by_size[210] == "A" and by_size[211] == "A;B" and by_size[212] == "A;B;C"
+        assert by_size[1] in {"A", "B", "C", "O"}
+
+    def test_the_species_column_is_cut_after_200_species(self):
+        names = ",".join(f"S{i}_1" for i in range(1, 206))
+        _, rows = self.rows(f"(O_1,({names}));", writer="table", species_of=lambda n: n.split("_")[0])
+        big = next(r for r in rows if r["n_tips"] == "205")
+        assert big["species"].endswith(";...") and len(big["species"].split(";")) == 201
+        assert big["tips"].endswith(";...") and len(big["tips"].split(";")) == 201
+
     def test_no_lengths_for_a_tree_read_without_them(self):
         _, rows = self.rows(LABELED)
         assert {r["dist"] for r in rows} == {""}

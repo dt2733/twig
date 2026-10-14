@@ -589,7 +589,7 @@ The option `-B` writes a table with one row per branch next to the tree, and `-F
 | `is_tip` | yes or no |
 | `n_tips` | the number of tips below the branch |
 | `tips` | the names of the tips below the branch, cut after 200 |
-| `species` | the species below the branch, only with `--select-on species` |
+| `species` | the species below the branch, each named once and cut after 200, only with `--select-on species` |
 | `label` | the label as written |
 | `kind` | tip, stem, crown (a labeled branch with the same label as its parent, or below a stem of its label) or internal |
 | `source` | where the label came from, which is the label and rule such as `Test:fitch`, or existing, stem, loss, ambiguous, background, or nothing if unlabeled |

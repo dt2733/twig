@@ -25,12 +25,13 @@ from typing import ClassVar
 from twig.utils import TwigError
 from twig.labeling.core import rooting, treeio
 from twig.labeling.core.constants import INTERNAL_NAME_CHOICES
+from twig.labeling.core.display import names_below
 from twig.labeling.core.model import RootMerge
 from twig.labeling.core.newick import braces_label, to_newick
 from twig.labeling.core.sanitize import NameTable, label_name_problem, sanitize_name
 from twig.labeling.core.validate import ERROR, WARNING, Issue
 
-# the table lists at most this many tip names in the tips column
+# the table lists at most this many tip names in the tips column, and this many species in the species column
 TIPS_SHOWN = 200
 
 
@@ -349,6 +350,11 @@ class NewickWriter(TreeWriter):
     help = "plain Newick with the labels removed"
 
 
+def _cut(names: list[str]) -> str:
+    """Return names joined by semicolons, cut after TIPS_SHOWN with ;... at the end."""
+    return ";".join(names[:TIPS_SHOWN]) + (";..." if len(names) > TIPS_SHOWN else "")
+
+
 def row_ids(tree) -> dict[int, str]:
     """Return an id for every non-root node for the branch table.
 
@@ -406,6 +412,8 @@ class TableWriter(Writer):
                         break
                     joined.extend(tips[child.idx])
                 tips[node.idx] = joined[: TIPS_SHOWN + 1]
+        # species below every node, each once, found from all tips and not only from the tips listed
+        species = names_below(tree, ctx.species_of, TIPS_SHOWN) if ctx.species_of else {}
 
         lines = ["\t".join(cols)] if ctx.header else []
         for node in tree:
@@ -426,16 +434,14 @@ class TableWriter(Writer):
                     note += " (labels differed)"
             elif dissolved:
                 note = "root-merge"
-            names = tips[node.idx]
-            shown = ";".join(names[:TIPS_SHOWN]) + (";..." if len(names) > TIPS_SHOWN else "")
             values = {
                 "locus": ctx.locus,
                 "idx": str(node.idx),
                 "node": ids[node.idx],
                 "is_tip": "yes" if node.is_leaf() else "no",
                 "n_tips": str(counts[node.idx]),
-                "tips": shown,
-                "species": ";".join(dict.fromkeys(ctx.species_of(n) for n in names[:TIPS_SHOWN])) if ctx.species_of else "",
+                "tips": _cut(tips[node.idx]),
+                "species": _cut(species[node.idx]) if ctx.species_of else "",
                 "label": label or "",
                 "kind": ctx.kinds.get(node.idx, ""),
                 "source": ctx.sources.get(node.idx, ""),

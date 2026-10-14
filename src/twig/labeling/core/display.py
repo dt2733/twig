@@ -21,28 +21,39 @@ CLADE_SHOWN = 8
 UNLABELED_SHOWN = 30
 
 
+def names_below(tree, name_of: Callable[[str], str], limit: int) -> dict[int, list[str]]:
+    """Return the names of the tips below every node, each once, in tree order.
+
+    `name_of` turns a tip name into the name listed, such as its species. A
+    list is cut after `limit` + 1 names, so a list longer than `limit` means
+    that there are more, and repeated names do not count toward the limit.
+    """
+    keep = limit + 1
+    names: dict[int, list[str]] = {}
+    for node in tree:
+        if node.is_leaf():
+            names[node.idx] = [name_of(node.name)]
+            continue
+        # a child with more than limit names was cut, but then this node is cut as well
+        joined: dict[str, None] = {}
+        for child in node.children:
+            for name in names[child.idx]:
+                joined.setdefault(name)
+                if len(joined) >= keep:
+                    break
+            if len(joined) >= keep:
+                break
+        names[node.idx] = list(joined)
+    return names
+
+
 def clade_text(tree, species_of: Callable[[str], str] | None = None, limit: int = CLADE_SHOWN) -> dict[int, str]:
     """Return the tips below every node as text, in tree order, cut after `limit` names.
 
     With `species_of` each species is named once, and repeated species do not
     count toward the limit.
     """
-    keep = limit + 1
-    names: dict[int, list[str]] = {}
-    for node in tree:
-        if node.is_leaf():
-            names[node.idx] = [species_of(node.name) if species_of else node.name]
-        else:
-            # a child with more than limit names was cut, but then this node is cut as well
-            joined: dict[str, None] = {}
-            for child in node.children:
-                for name in names[child.idx]:
-                    joined.setdefault(name)
-                    if len(joined) >= keep:
-                        break
-                if len(joined) >= keep:
-                    break
-            names[node.idx] = list(joined)
+    names = names_below(tree, species_of or (lambda name: name), limit)
     out = {}
     for idx, items in names.items():
         out[idx] = "+".join(items[:limit]) + ("+..." if len(items) > limit else "")
