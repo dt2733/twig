@@ -284,6 +284,15 @@ class TestOutputs:
         _, _, err = run(f"-i {trees} -L Test ^[AB]$ --show")
         assert "tree trees_1" in err and "tree trees_2" in err
 
+    def test_the_listing_describes_the_tree_written_for_hyphy(self, run):
+        # the listing counted 6 Reference branches while the HyPhy tree has 5
+        _, out, err = run(STEP_1 + " -F hyphy --show")
+        assert out == UNROOTED + "\n"
+        assert "root     the branches O and M1+A+B+C+M2+D+E at the root are written as one branch, listed as O" in err
+        assert "summary  5 Reference, 5 Test, 1 Rev, 2 unlabeled" in err
+        _, _, err = run(STEP_1 + " --show")
+        assert "summary  6 Reference, 5 Test, 1 Rev, 2 unlabeled" in err and "root     " not in err
+
     def test_the_listing_does_not_name_a_single_tree(self, run):
         _, _, err = run(STEP_1 + " --show")
         assert "tree species" not in err

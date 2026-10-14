@@ -4,7 +4,7 @@ import pytest
 
 pytest.importorskip("toytree")
 
-from twig.labeling.core import display, treeio
+from twig.labeling.core import display, rooting, treeio
 from twig.labeling.core.labelsets import LabelingConfig, LabelSet, apply_label_sets
 from twig.labeling.core.validate import ERROR, WARNING, Issue, errors, warnings
 from conftest import LABELED, SPECIES
@@ -59,6 +59,34 @@ class TestBranchListing:
         tree = treeio.read_tree("((A_1,A_2),(B_1,C_1));")
         text = display.clade_text(tree, lambda n: n.split("_")[0])
         assert sorted(text.values()) == ["A", "A", "A", "A+B+C", "B", "B+C", "C"]
+
+    def test_repeated_species_do_not_count_toward_the_cut(self):
+        # the cut counted the samples of A to E twice, so F, G and H were left out without +...
+        tree = treeio.read_tree("(O_1,((A_1,B_1,C_1,D_1,E_1),(A_2,B_2,C_2,D_2,E_2),(F_1,G_1,H_1)));")
+        species = lambda n: n.split("_")[0]
+        stem = tree.treenode.children[1].idx
+        assert display.clade_text(tree, species)[stem] == "A+B+C+D+E+F+G+H"
+        assert display.clade_text(tree, species, limit=7)[stem] == "A+B+C+D+E+F+G+..."
+        assert display.clade_text(tree, species, limit=3)[stem] == "A+B+C+..."
+        assert display.clade_text(tree, species, limit=5)[tree.treenode.children[1].children[0].idx] == "A+B+C+D+E"
+
+    def test_with_a_root_merge_the_tree_is_described_as_it_is_written(self):
+        # the dissolved ingroup branch was listed as a Reference branch of its own, which HyPhy never sees
+        tree = treeio.read_tree(SPECIES)
+        sets = [LabelSet("Test", "fitch", ("^[ABDE]$",))]
+        result = apply_label_sets(tree, sets, LabelingConfig(stems="unlabel", losses="Rev", background="Reference"))
+        labeled = treeio.set_labels(tree, result.labels)
+        merge = rooting.plan_root_merge(labeled)
+        lines = display.branch_listing(labeled, result.labels, result.kind, result.source, merge=merge)
+        assert "M1+A+B+C+M2+D+E" not in " ".join(line for line in lines if line.startswith("  "))
+        assert lines[-2] == "root     the branches O and M1+A+B+C+M2+D+E at the root are written as one branch, listed as O"
+        assert lines[-1] == "summary  5 Reference, 5 Test, 1 Rev, 2 unlabeled"
+
+    def test_the_kept_root_branch_has_the_merged_label(self):
+        tree = treeio.read_tree("(A{X},(B{Y},C{Y}){Z});")
+        lines = display.branch_listing(tree, treeio.labeled_branches(tree), merge=rooting.plan_root_merge(tree))
+        assert ["-", "tip", "A"] in [line.split() for line in lines]
+        assert lines[-1] == "summary  2 Y, 1 unlabeled"
 
     def test_a_long_list_of_unlabeled_branches_is_cut(self):
         names = ",".join(f"t{i}" for i in range(50))

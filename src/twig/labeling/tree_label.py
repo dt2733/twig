@@ -284,13 +284,14 @@ def run_tree_label(args) -> None:
 
         with at_tree(locus):
             pieces.append(writer.render(labeled, ctx))
+            plan = writer.plan(labeled, ctx) if isinstance(writer, writers.TreeWriter) else None
             if args.branch_table:
-                plan = writer.plan(labeled, ctx) if isinstance(writer, writers.TreeWriter) else None
                 table_pieces.append(table_writer.render(labeled, replace(ctx, plan=plan)))
         if args.show:
+            # the listing describes the tree as it is written, like the table
             heading = [f"tree {locus}"] if len(records) > 1 else []
             sys.stderr.write("\n".join(heading + display.branch_listing(
-                labeled, result.labels, result.kind, result.source, species_of)) + "\n")
+                labeled, result.labels, result.kind, result.source, species_of, merge=plan.merge if plan else None)) + "\n")
 
     missing = rooting.missing_policy_label(args.root_edges, seen_labels)
     if missing:

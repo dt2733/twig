@@ -626,7 +626,7 @@ S13   7              internal
 
 ## Checking the result
 
-The option `--show` prints one line for every labeled branch to stderr, in the order of the tree, followed by the unlabeled branches. Each line gives the label, the role of the branch and the tips below it, where X+Y means the branch above the common ancestor of X and Y. The roles are tip, stem, loss, ambiguous, crown and internal. The stems that were left without a label are listed as well, so that they are not missed.
+The option `--show` prints one line for every labeled branch to stderr, in the order of the tree, followed by the unlabeled branches. Each line gives the label, the role of the branch and the tips below it, where X+Y means the branch above the common ancestor of X and Y. The roles are tip, stem, loss, ambiguous, crown and internal. The stems that were left without a label are listed as well, so that they are not missed. With `--select-on species` each species below a branch is named once, and a clade is cut after eight names, which is shown by `+...` at the end. Like the branch table, the listing describes the tree as it is written, so with `-F hyphy` the two branches at the root are listed as the one branch that HyPhy sees, with the joined label, and a line names the two branches that were joined.
 
 ## Step 1 of an analysis
 
