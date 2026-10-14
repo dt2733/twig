@@ -172,7 +172,10 @@ def parse_map_file(path: str | Path) -> list[MapRow]:
 
     Rows have one to three whitespace-separated columns, `<sample> [<species>
     [<specimen>]]`. A one-column row maps a name to itself, and a sample that
-    starts with `~` is a regular expression applied with `re.search`.
+    starts with `~` is a regular expression applied with `re.search`. A row
+    whose sample holds a comma is refused when the row has one column or the
+    sample ends with the comma, because the file is then most likely
+    comma-separated and every row would map a name to itself.
     """
     path = Path(path)
     try:
@@ -195,6 +198,8 @@ def parse_map_file(path: str | Path) -> list[MapRow]:
         sample = parts[0]
         species = parts[1] if len(parts) > 1 else None
         specimen = parts[2] if len(parts) > 2 else None
+        if not sample.startswith("~") and "," in sample and (species is None or sample.endswith(",")):
+            raise TwigError(f"{where}: the row looks comma-separated, but the columns of a map file are separated by spaces or tabs")
 
         if sample.startswith("~"):
             expression = sample[1:]
@@ -387,7 +392,8 @@ class NameMapper:
     delim, delim_idxs, delim_join:
         Parse a species key by splitting the name on a delimiter, keeping the
         listed indices, and joining them (by the delimiter if no join is set).
-        Names that cannot be split as asked fall through.
+        Names that cannot be split as asked, including names without the
+        delimiter, fall through.
     vocabulary: Iterable[str]
         Species names that names are matched to.
     normalize: Sequence[str]
@@ -488,6 +494,8 @@ class NameMapper:
                 return None, None
             return (found.group("species") or None), (found.groupdict().get("specimen") or None)
         if self.delim is not None:
+            if self.delim not in name:
+                return None, None
             parts = name.split(self.delim)
             try:
                 kept = [parts[i] for i in self.delim_idxs]

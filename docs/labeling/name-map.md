@@ -176,7 +176,7 @@ Besides the counts and the names that need attention, the summary names every tr
 
 ## Parsing names
 
-Names that follow a pattern can be parsed before they are matched. The option `-d` splits a name on a delimiter and keeps the pieces listed in `-di`, joined by `-dj`, which defaults to the delimiter itself. The tool matches the parsed name to the species tree first and falls back to the whole name if the parsed name does not match. A name that cannot be split as asked is not an error, it just goes straight to the whole name.
+Names that follow a pattern can be parsed before they are matched. The option `-d` splits a name on a delimiter and keeps the pieces listed in `-di`, joined by `-dj`, which defaults to the delimiter itself. The tool matches the parsed name to the species tree first and falls back to the whole name if the parsed name does not match. A name that cannot be split as asked, such as a name without the delimiter, is not an error, it just goes straight to the whole name.
 
 ```bash
 twig name-map -i genes.nwk -s species.nwk -d - -di 1
@@ -204,7 +204,7 @@ Spinacia_oleracea_s1  Spinacia_oleracea  s1        exact   ok      s1        -  
 
 ## Map files
 
-When names cannot be matched by rules, or when you have decided what a name means, give the answer in a map file with `-I`. Each row has up to three columns separated by whitespace, which are the sample, the species and optionally the specimen. A `#` that starts a word begins a comment, and blank lines are ignored. A row with one column maps a name to itself, which is how the IMAP files of `tree-filter` work. A sample that starts with `~` is a regular expression that is applied with `re.search`, and these rows are tried in the order of the file after all the rows that name a sample exactly.
+When names cannot be matched by rules, or when you have decided what a name means, give the answer in a map file with `-I`. Each row has up to three columns separated by whitespace, which are the sample, the species and optionally the specimen. A `#` that starts a word begins a comment, and blank lines are ignored. A row with one column maps a name to itself, which is how the IMAP files of `tree-filter` work. A row that looks comma-separated, with one column that holds a comma or a sample that ends with one, is refused, because every row of such a file would map a name to itself. A sample that starts with `~` is a regular expression that is applied with `re.search`, and these rows are tried in the order of the file after all the rows that name a sample exactly.
 
 ```
 # sample                    species               specimen (optional)

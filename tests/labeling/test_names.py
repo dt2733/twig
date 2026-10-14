@@ -99,10 +99,16 @@ class TestMapFile:
         ("~onlyregex\n", r"regular expression rows need a species column"),
         ("~ Beta_vulgaris\n", r"map.tsv:1: empty regular expression"),
         ("# nothing here\n\n", r"no map rows found"),
+        ("s1,Amaranthus_pumilus\n", r"map.tsv:1: the row looks comma-separated"),
+        ("s1, Amaranthus_pumilus\n", r"map.tsv:1: the row looks comma-separated"),
     ])
     def test_errors_name_the_line(self, tmp_path, text, message):
         with pytest.raises(TwigError, match=message):
             parse_map_file(self.write(tmp_path, text))
+
+    def test_commas_inside_a_column_are_fine_otherwise(self, tmp_path):
+        rows = parse_map_file(self.write(tmp_path, "s1,a Amaranthus_pumilus\n~^A{1,2}_ Beta_vulgaris\n"))
+        assert [r.sample for r in rows] == ["s1,a", "^A{1,2}_"]
 
     def test_missing_file(self, tmp_path):
         with pytest.raises(TwigError, match="cannot read map file"):
@@ -285,6 +291,13 @@ class TestPrecedence:
     def test_delimiter_rule_that_cannot_split_falls_through(self):
         mapper = NameMapper(vocabulary=SPECIES, delim="|", delim_idxs=[1])
         assert mapper.resolve("Beta_vulgaris").species == "Beta_vulgaris"
+
+    def test_a_name_without_the_delimiter_falls_through(self):
+        # with -di 0 the whole name used to become the key, so it looked resolved by the delimiter
+        hit = NameMapper(delim="_").resolve("Apum2")
+        assert (hit.species, hit.method) == ("Apum2", "self")
+        assert NameMapper(delim="_", delim_idxs=[0, -1]).resolve("Apum2").method == "self"
+        assert NameMapper(delim="_").resolve("Apum_2").method == "delim"
 
     def test_delimiter_join_defaults_to_the_delimiter(self):
         mapper = NameMapper(delim="_", delim_idxs=[0, 1])
