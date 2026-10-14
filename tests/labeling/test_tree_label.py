@@ -625,6 +625,13 @@ class TestSpeciesMapping:
         assert out == "((Amaranthus_pumilus_s1{Test},AmaranthusPumilus-s2),(Beta_vulgaris_s1,A_hybridus_s1{Test}));\n"
         assert "AmaranthusPumilus-s2 (it matches no species of the species list, the closest are Amaranthus_pumilus" in err
 
+    def test_a_species_list_that_is_not_text_is_a_clear_error(self, run, gene, tmp_path):
+        species = tmp_path / "species.txt"
+        species.write_bytes(b"Amaranthus_pumilus\n\xff\xfe\nBeta_vulgaris\n")
+        code, out, err = run(f"-i {gene} -L Test A --select-on species -V {species} --rule tips")
+        assert code == 1 and out == ""
+        assert "species.txt is not valid UTF-8 text" in err and "Traceback" not in err
+
     def test_ambiguous_names_and_map_rows_are_checked_against_the_species_list(self, run, tmp_path):
         tree = tmp_path / "g.nwk"
         tree.write_text("((A_pumilus_s1,Beta_vulgaris_s1),x1);")

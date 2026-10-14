@@ -12,12 +12,45 @@ from twig.labeling.core.names import (
     canonical,
     normalize_steps,
     parse_map_file,
+    read_vocab_list,
     tokens,
     write_frozen_map,
     write_hit_table,
 )
 
 SPECIES = ["Amaranthus_pumilus", "Amaranthus_hybridus", "Atriplex_pumilus", "Beta_vulgaris"]
+
+
+###########################################################################
+# species lists
+###########################################################################
+
+class TestReadVocabList:
+    def test_one_name_per_line_with_comments_and_blank_lines(self, tmp_path):
+        path = tmp_path / "species.txt"
+        path.write_text("# the species\nAmaranthus_pumilus  extra words\n\n  Beta_vulgaris\n")
+        assert read_vocab_list(path) == ["Amaranthus_pumilus", "Beta_vulgaris"]
+
+    def test_a_byte_order_mark_is_not_part_of_the_first_name(self, tmp_path):
+        path = tmp_path / "species.txt"
+        path.write_bytes("\ufeffAmaranthus_pumilus\nBeta_vulgaris\n".encode("utf-8"))
+        assert read_vocab_list(path) == ["Amaranthus_pumilus", "Beta_vulgaris"]
+
+    def test_an_empty_list_is_an_error(self, tmp_path):
+        path = tmp_path / "species.txt"
+        path.write_text("# nothing here\n\n")
+        with pytest.raises(TwigError, match="no species names found"):
+            read_vocab_list(path)
+
+    def test_a_missing_file_is_an_error(self, tmp_path):
+        with pytest.raises(TwigError, match="cannot read species list"):
+            read_vocab_list(tmp_path / "missing.txt")
+
+    def test_a_file_that_is_not_text_is_an_error_and_not_a_traceback(self, tmp_path):
+        path = tmp_path / "species.txt"
+        path.write_bytes(b"Amaranthus_pumilus\n\xff\xfe\n")
+        with pytest.raises(TwigError, match="species.txt is not valid UTF-8 text"):
+            read_vocab_list(path)
 
 
 ###########################################################################
