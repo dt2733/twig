@@ -58,6 +58,11 @@ _PAML_HEADER = re.compile(r"^\s*\d+\s+\d+\s*$")
 _LOCUS_PREFIX = re.compile(r"^([^\s(\[;]+)\t+((?:\[[^\]]*\]\s*)*\(.*)$")
 # lines of a NEXUS file, which can come without the #NEXUS header
 _NEXUS_LINE = re.compile(r"^(#NEXUS\b|begin\s+\w+\s*;|u?tree\s+(\*\s*)?[^\s=(\[]+\s*=)", re.IGNORECASE)
+# characters that end a name, a number or a label
+_NOT_IN_WORDS = "()[]{},:;#$"
+_WORD_END = re.compile(r"[^()\[\]{},:;#$\s]*$")
+_WORD_START = re.compile(r"[^()\[\]{},:;#$\s]*")
+_SPACE_IN_WORD = "Names and labels cannot contain spaces, so replace the spaces with underscores"
 _NUMBER = r"[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?"
 _IS_NUMBER = re.compile(rf"^{_NUMBER}$")
 _IS_DOUBLE_SUPPORT = re.compile(rf"^({_NUMBER})/({_NUMBER})$")
@@ -138,22 +143,41 @@ def _read_text(path: str | Path) -> str:
 
 
 def _compact(text: str, source: str, number: int) -> str:
-    """Remove whitespace outside [...] comments, and refuse quoted names."""
+    """Remove whitespace outside [...] comments, and refuse quoted names and names with spaces.
+
+    Whitespace between tokens is fine, as in `(A, B)` or `A #1`, but whitespace
+    inside a name, a number or a label in braces is an error, because removing
+    it would join two words without a word.
+    """
     out = []
     depth = 0
-    for ch in text:
+    gap = False         # whitespace came after the last character kept
+    word = False        # the last character kept is part of a name, a number or a label
+    mark = False        # the last characters kept are a PAML mark such as #1
+    for pos, ch in enumerate(text):
         if ch == "[":
             depth += 1
         elif ch == "]":
             depth = max(0, depth - 1)
         if depth:
             out.append(" " if ch in "\n\r\t" else ch)
-        elif not ch.isspace():
-            if ch in "'\"":
-                raise TwigError(
-                    f"{source}: tree {number} has quoted labels, which are not supported; remove the quotes"
-                )
-            out.append(ch)
+            gap = word = mark = False
+            continue
+        if ch.isspace():
+            gap = True
+            continue
+        if ch in "'\"":
+            raise TwigError(
+                f"{source}: tree {number} has quoted labels, which are not supported; remove the quotes"
+            )
+        mark = ch in "#$" or (mark and ch.isdigit())
+        is_word = not mark and ch not in _NOT_IN_WORDS
+        if gap and word and is_word:
+            before = _WORD_END.search("".join(out[-200:])).group()
+            after = _WORD_START.match(text, pos).group()
+            raise TwigError(f"{source}: tree {number} has a space in {before + ' ' + after!r}. {_SPACE_IN_WORD}")
+        out.append(ch)
+        gap, word = False, is_word
     return "".join(out)
 
 
@@ -194,7 +218,7 @@ def iter_trees_text(text: str, source: str = "<text>") -> Iterator[tuple[str | N
             elif ch == ";" and depth == 0:
                 pieces.append(stripped[start:pos + 1])
                 number += 1
-                yield locus, _compact("".join(pieces), source, number)
+                yield locus, _compact("\n".join(pieces), source, number)
                 pieces, in_tree, locus, start = [], False, None, pos + 1
         rest = stripped[start:]
         if rest:
@@ -218,11 +242,12 @@ def _tokens(newick: str) -> Iterator[tuple[str, str, int]]:
     """Yield (kind, text, position) for each token, skipping whitespace.
 
     Text that toytree would misread is an error. A tree cannot have text before
-    its first `(`, and a name or support value cannot follow a label or a
-    comment directly, because toytree would glue it to the annotation.
+    its first `(`, a name or support value cannot follow a label or a comment
+    directly, because toytree would glue it to the annotation, and names and
+    labels cannot contain spaces.
     """
     pos, size = int(newick.startswith("\ufeff")), len(newick)     # a byte order mark is skipped
-    last = None             # kind of the last token that is not whitespace
+    last = previous = None  # kind and text of the last token that is not whitespace
     leading = None          # (text, position) of text before the first (
     opened = False
     while pos < size:
@@ -231,6 +256,8 @@ def _tokens(newick: str) -> Iterator[tuple[str, str, int]]:
             raise TwigError(f"unexpected character {newick[pos]!r} at position {pos} of the tree")
         kind, token = found.lastgroup, found.group()
         if kind == "text":
+            if last == "text" and opened:       # only whitespace separates two texts
+                raise TwigError(f"the tree has a space in {previous + ' ' + token!r} at position {pos}. {_SPACE_IN_WORD}")
             if last in ("brace", "mark", "comment"):
                 raise TwigError(
                     f"unexpected text {token!r} at position {pos} of the tree, after a label or comment. "
@@ -245,9 +272,11 @@ def _tokens(newick: str) -> Iterator[tuple[str, str, int]]:
                     "A line can start with a locus name and a TAB, and NEXUS files are not supported"
                 )
             opened = True
+        elif kind == "brace" and re.search(r"\s", token[1:-1].strip()):
+            raise TwigError(f"the label {token!r} at position {pos} of the tree has a space. {_SPACE_IN_WORD}")
         if kind != "space":
             yield kind, token, pos
-            last = kind
+            last, previous = kind, token
         pos = found.end()
 
 

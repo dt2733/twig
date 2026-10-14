@@ -542,6 +542,7 @@ class TestErrors:
         ("((Pop#12a,B),C);\n", "unexpected text 'a' at position 8 of the tree, after a label or comment"),
         ("locus1 ((A,B),C);\n", "unexpected text 'locus1' at position 0 of the tree, before its first '('"),
         ("begin trees;\ntree t1 = ((A,B),C);\nend;\n", "NEXUS format is not supported"),
+        ("((Homo sapiens:1,B:1):1,C:1);\n", "tree 1 has a space in 'Homo sapiens'"),
     ])
     def test_text_in_the_wrong_place_is_a_clear_error(self, run, tmp_path, text, message):
         path = tmp_path / "x.nwk"

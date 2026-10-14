@@ -95,6 +95,23 @@ class TestIterTrees:
         with pytest.raises(TwigError, match="NEXUS format is not supported"):
             list(treeio.iter_trees_text(text))
 
+    def test_whitespace_between_tokens_is_removed(self):
+        text = "( A , B ) ;\n(A #1 , B);\n((A:1, B:2) 95 : 0.3, C { Test } :1);\n(A[a\nnote],\nB);\n"
+        trees = [t for _, t in treeio.iter_trees_text(text)]
+        assert trees == ["(A,B);", "(A#1,B);", "((A:1,B:2)95:0.3,C{Test}:1);", "(A[a note],B);"]
+
+    @pytest.mark.parametrize("text, words", [
+        ("((Homo sapiens:1,B:1):1,C:1);", "Homo sapiens"),
+        ("((Homo\tsapiens,B),C);", "Homo sapiens"),
+        ("((Homo\nsapiens,B),C);", "Homo sapiens"),
+        ("((A{Te st},B),C);", "Te st"),
+        ("((A,B)9 5,C);", "9 5"),
+    ])
+    def test_a_space_inside_a_name_or_label_is_an_error(self, text, words):
+        # the whitespace was removed, so Homo sapiens became Homosapiens without a word
+        with pytest.raises(TwigError, match=f"tree 1 has a space in '{words}'. Names and labels cannot contain spaces"):
+            list(treeio.iter_trees_text(text))
+
     def test_a_locus_name_can_be_followed_by_a_comment_before_the_tree(self):
         assert list(treeio.iter_trees_text("L1\t[&R] ((A,B),C);\n")) == [("L1", "[&R]((A,B),C);")]
         # a locus named tree is not taken for NEXUS
@@ -126,6 +143,8 @@ class TestTipNames:
         ("treet1=((A,B),C);", "unexpected text 'treet1=' at position 0 of the tree, before its first"),
         ("locus1((A,B),C);", "unexpected text 'locus1' at position 0 of the tree, before its first"),
         ("((A{Test}x,B),C);", "unexpected text 'x' at position 9 of the tree, after a label or comment"),
+        ("((Homo sapiens,B),C);", "space in 'Homo sapiens' at position 7"),
+        ("((A{Te st},B),C);", "the label '{Te st}' at position 3 of the tree has a space"),
     ])
     def test_errors(self, newick, message):
         with pytest.raises(TwigError, match=message):
@@ -340,6 +359,14 @@ class TestLabelSyntaxes:
     def test_text_before_the_tree_is_a_clear_error(self, newick):
         with pytest.raises(TwigError, match="before its first '\\('"):
             treeio.parse_newick(newick)
+
+    def test_a_label_with_a_space_is_refused_from_text_as_from_files(self):
+        # a file gave the label Test and a string gave 'Te st'
+        with pytest.raises(TwigError, match="has a space"):
+            treeio.parse_newick("((A{Te st},B),C);")
+        with pytest.raises(TwigError, match="has a space"):
+            treeio.read_tree("((A{Te st},B),C);")
+        assert treeio.parse_newick("((A{ Test },B),C);").tree[0].label == "Test"
 
     def test_a_single_tip_and_a_leading_comment_are_fine(self):
         assert [n.name for n in treeio.parse_newick("A;").tree] == ["A"]
