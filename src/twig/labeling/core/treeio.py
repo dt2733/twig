@@ -563,7 +563,8 @@ def _paml_labels(tree: "ToyTree", codes: Mapping[int | str, str] | None) -> None
 
     A `$` mark labels its clade, meaning the branch above the node and all
     branches below it. An explicit `#` beats `$`, and an inner `$` beats an
-    outer one.
+    outer one. The mark 0 is codeml's background, the same as no mark, so it
+    gives no label unless the codes name it.
     """
     names = {str(k): v for k, v in (codes or {}).items()}
     clade_of: dict[int, int | None] = {}
@@ -574,6 +575,8 @@ def _paml_labels(tree: "ToyTree", codes: Mapping[int | str, str] | None) -> None
         clade = _stored_number(own_clade, node) if own_clade is not None else inherited
         clade_of[node.idx] = clade
         mark = _stored_number(own_mark, node) if own_mark is not None else clade
+        if mark == 0 and "0" not in names:
+            mark = None
         node.label = None if mark is None else names.get(str(mark), str(mark))
 
 
@@ -695,7 +698,8 @@ def read_tree(
         labels are removed.
     paml_codes: Mapping
         Names for PAML label numbers, for example {1: "Test", 2: "Reference"}.
-        Numbers without a name are used as the label text.
+        Numbers without a name are used as the label text, except 0, which is
+        codeml's background and gives no label.
     """
     newick, where = _single_newick(source)
     return parse_newick(newick, label_syntax, paml_codes, where).tree

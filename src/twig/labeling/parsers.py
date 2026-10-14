@@ -485,7 +485,7 @@ def get_parser_tree_label(parser: ArgumentParser | None = None) -> ArgumentParse
     io.add_argument("-F", "--format", type=str, metavar="str", choices=FORMAT_NAMES, default="braces", help="what to write (" + ", ".join(FORMAT_NAMES) + "). braces is the tree with labels in braces after the names, hyphy is the same made ready for HyPhy (safe tip names, written unrooted), newick is the plain tree without labels, and table has one row per branch [%(default)s]")
     io.add_argument("-B", "--branch-table", type=Path, metavar="path", help="also write a table with one row per branch, with its label, its role, the tips below it and where the label came from")
     io.add_argument("--show", action="store_true", help="print the labeled branches, clade by clade, to the screen so that the result can be checked by eye")
-    io.add_argument("--paml-codes", type=str, metavar="str", nargs="+", help="names for the PAML label numbers in the input, such as 1=Test 2=Reference")
+    io.add_argument("--paml-codes", type=str, metavar="str", nargs="+", help="names for the PAML label numbers in the input, such as 1=Test 2=Reference. 0 is the background of PAML and gives no label unless it is named here")
 
     select = parser.add_argument_group("Selection")
     select.add_argument("-L", "--label", type=str, metavar="str", nargs="+", action="append", help="a label name followed by the tips it goes to, which are list files or regular expressions. Repeat -L for more labels. A rule can follow the name, joined to it with a colon, to give that label its own rule")

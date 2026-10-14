@@ -39,7 +39,7 @@ from twig.labeling.core.labelsets import (
 from twig.labeling.core.names import NameMapper
 from twig.labeling.core.parsimony import to_fraction
 from twig.labeling.core.rules import resolve_rule
-from twig.labeling.core.sanitize import NameTable
+from twig.labeling.core.sanitize import NameTable, label_name_problem
 from twig.labeling.core.validate import errors, warnings
 
 
@@ -58,14 +58,48 @@ def at_tree(locus: str):
 
 
 def read_paml_codes(items: list[str] | None) -> dict[str, str] | None:
-    """Return the names of PAML label numbers from entries such as 1=Test."""
+    """Return the names of PAML label numbers from entries such as 1=Test.
+
+    The names are label names, so they are checked like the other label names
+    before any tree is read.
+    """
     codes = {}
     for item in items or ():
         number, equals, name = item.partition("=")
-        if not equals or not number.strip() or not name.strip():
+        if not equals or not number.strip().isdigit() or not name.strip():
             raise TwigError(f"--paml-codes expects entries such as 1=Test, got {item!r}")
-        codes[number.strip()] = name.strip()
+        codes[str(int(number))] = name.strip()
+    for number, name in codes.items():
+        problem = label_name_problem(name)
+        if problem:
+            raise TwigError(f"--paml-codes gives {number} the name {name!r}, which {problem}")
     return codes or None
+
+
+def input_label_warnings(tree, syntax: str | None, seen: set[str]) -> list[str]:
+    """Return warnings for the labels read from a tree that are not valid label names.
+
+    Such labels are kept and written as they are, but HyPhy cannot use them, so
+    each one is named once per run. PAML numbers without a name are named in
+    one warning, with a hint to name them with --paml-codes. `seen` holds the
+    labels already named.
+    """
+    bad = {}
+    for label in sorted(set(treeio.labeled_branches(tree).values()) - seen):
+        problem = label_name_problem(label)
+        if problem:
+            bad[label] = problem
+    seen.update(bad)
+    if syntax == "paml" and bad:
+        numbers = sorted(bad, key=lambda i: (len(i), i))
+        if len(numbers) == 1:
+            what, it = f"the PAML label number {numbers[0]} has no name", "it"
+        else:
+            what, it = f"the PAML label numbers {', '.join(numbers[:-1])} and {numbers[-1]} have no names", "them"
+        return [
+            f"{what}, and HyPhy cannot use a number as a label. Name {it} with --paml-codes, such as --paml-codes {numbers[0]}=Test"
+        ]
+    return [f"the label {label!r} read from the tree {problem}, so HyPhy cannot use it" for label, problem in bad.items()]
 
 
 def build_label_sets(args) -> list[LabelSet]:
@@ -195,11 +229,15 @@ def run_tree_label(args) -> None:
     pieces: list[str] = []
     table_pieces: list[str] = []
     seen_labels: set[str] = set()
+    bad_input_labels: set[str] = set()
     for number, (locus, newick, path) in enumerate(records):
         parsed = treeio.parse_newick(newick, "auto", paml_codes, source=f"{path} ({locus})")
         tree = parsed.tree
         if parsed.root_label:
             logger.warning(f"{locus}: ignoring the label {parsed.root_label!r} on the root, which has no branch")
+        if config.existing == "keep":
+            for message in input_label_warnings(tree, parsed.syntax, bad_input_labels):
+                logger.warning(f"{locus}: {message}")
 
         outgroup_side = None
         if args.outgroups:

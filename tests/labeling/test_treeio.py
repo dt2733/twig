@@ -276,6 +276,17 @@ class TestLabelSyntaxes:
         tree = treeio.read_tree("((A #1,B),C);")
         assert [n.label for n in tree if n.is_leaf()] == ["1", None, None]
 
+    def test_paml_zero_is_the_background_and_gives_no_label(self):
+        # 0 was read as a label named '0', which HyPhy cannot use
+        tree = treeio.read_tree("((A #1,B #0)$1,(C,D) #0,E);", paml_codes={1: "Test"})
+        assert {n.name: n.label for n in tree if n.is_leaf()} == {"A": "Test", "B": None, "C": None, "D": None, "E": None}
+        assert tree.get_mrca_node(0, 1).label == "Test" and tree.get_mrca_node(2, 3).label is None
+        # an inner $0 takes its clade back to the background, and 0 can still be named
+        tree = treeio.read_tree("(((A,B)$0,C)$1,D);")
+        assert {n.name: n.label for n in tree if n.is_leaf()} == {"A": None, "B": None, "C": "1", "D": None}
+        tree = treeio.read_tree("((A #1,B #0)$1,(C,D) #0,E);", paml_codes={1: "Test", 0: "Reference"})
+        assert {n.name: n.label for n in tree if n.is_leaf()}["B"] == "Reference"
+
     def test_paml_clade_marks_expand_like_codeml(self):
         # $1 labels the branch above the node and every branch below it; # beats $; an inner $ beats an outer one
         tree = treeio.read_tree("(((A,B #2) $1,(C,D $3) $4) $5,E);", paml_codes={1: "One", 2: "Two", 3: "Three", 4: "Four", 5: "Five"})

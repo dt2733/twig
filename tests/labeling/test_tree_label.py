@@ -435,10 +435,53 @@ class TestExistingLabels:
 
     def test_paml_codes_must_look_like_number_equals_name(self):
         assert read_paml_codes(["1=Test", "2=Ref"]) == {"1": "Test", "2": "Ref"}
+        assert read_paml_codes(["01=Test"]) == {"1": "Test"}
         assert read_paml_codes(None) is None
-        for bad in ("1", "=Test", "1="):
+        for bad in ("1", "=Test", "1=", "x=Test"):
             with pytest.raises(TwigError, match="--paml-codes expects"):
                 read_paml_codes([bad])
+
+    @pytest.mark.parametrize("code, message", [
+        ("0=unlabel", "--paml-codes gives 0 the name 'unlabel', which is a word that twig uses"),
+        ("1=9x", "--paml-codes gives 1 the name '9x', which must start with a letter"),
+        ("1=All", "--paml-codes gives 1 the name 'All', which collides with a HyPhy branch-set option"),
+    ])
+    def test_paml_code_names_are_checked_like_other_label_names(self, run, tmp_path, code, message):
+        # 0=unlabel wrote a label named unlabel
+        code_, out, err = run(f"-i {tmp_path / 'nothing.nwk'} --paml-codes {code}")
+        assert code_ == 1 and out == "" and message in err and "cannot read tree file" not in err
+
+    def test_paml_zero_is_the_background(self, run, tmp_path):
+        # #0 was written as the label 0, and -F hyphy stopped because 0 is not a label name
+        tree = tmp_path / "t.nwk"
+        tree.write_text("((A #1,B #0)$1,(C,D) #0,E);")
+        code, out, err = run(f"-i {tree} --paml-codes 1=Test")
+        assert code == 0 and out == "((A{Test},B){Test},(C,D),E);\n"
+        code, out, err = run(f"-i {tree} --paml-codes 1=Test -F hyphy")
+        assert code == 0 and out == "((A{Test},B){Test},(C,D),E);\n"
+        _, out, _ = run(f"-i {tree} --paml-codes 1=Test 0=Reference")
+        assert out == "((A{Test},B{Reference}){Test},(C,D){Reference},E);\n"
+
+    def test_paml_numbers_without_names_give_a_warning(self, run, tmp_path):
+        # {1} and {2} were written without a word, and only -F hyphy said that they are not label names
+        tree = tmp_path / "t.nwk"
+        tree.write_text("(O #2,((M1 #2,(A #1,(B #1,C) #1)),(M2,(D #1,E #1))));\n(O #2,(A #1,B));\n")
+        code, out, err = run(f"-i {tree}")
+        assert code == 0 and trees_of(out)[0] == "(O{2},((M1{2},(A{1},(B{1},C){1})),(M2,(D{1},E{1}))));"
+        message = "the PAML label numbers 1 and 2 have no names, and HyPhy cannot use a number as a label. Name them with --paml-codes"
+        assert err.count(message) == 1                  # once for the run, not once for each tree
+        _, _, err = run(f"-i {tree} --paml-codes 1=Test 2=Reference")
+        assert "have no names" not in err
+        _, _, err = run(f"-i {tree} --existing clear")
+        assert "have no names" not in err
+
+    def test_labels_in_the_tree_that_hyphy_cannot_use_give_a_warning(self, run, tmp_path):
+        tree = tmp_path / "t.nwk"
+        tree.write_text("((A{Internal},B{Test}),C);")
+        code, out, err = run(f"-i {tree}")
+        assert code == 0 and out == "((A{Internal},B{Test}),C);\n"
+        assert "the label 'Internal' read from the tree collides with a HyPhy branch-set option" in err
+        assert "'Test' read from the tree" not in err
 
 
 class TestSeveralLabels:

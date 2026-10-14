@@ -46,7 +46,7 @@ Input/Output:
                                    is the plain tree without labels, and table has one row per branch [braces]
   -B, --branch-table path          also write a table with one row per branch, with its label, its role, the tips below it and where the label came from
   --show                           print the labeled branches, clade by clade, to the screen so that the result can be checked by eye
-  --paml-codes str [str ...]       names for the PAML label numbers in the input, such as 1=Test 2=Reference
+  --paml-codes str [str ...]       names for the PAML label numbers in the input, such as 1=Test 2=Reference. 0 is the background of PAML and gives no label unless it is named here
 
 Selection:
   -L, --label str [str ...]        a label name followed by the tips it goes to, which are list files or regular expressions. Repeat -L for more labels. A rule can follow the name, joined to it with a colon, to give that
@@ -392,6 +392,8 @@ $ twig tree-label -i roots.nwk -F hyphy --keep-root
 ## Reading trees
 
 The input holds one or more Newick trees, and a tree can span several lines. Blank lines, comment lines that start with `#` and a PAML header with the number of species and trees are skipped, a line can start with a locus name and a TAB, and a byte order mark at the start of the file, which some Windows editors add, is ignored. NEXUS files and quoted names are not supported. Labels can be written in braces as HyPhy writes them, as PAML marks such as `#1` and `$1`, or as the `label` key of NHX and FigTree annotations. A label goes after the name or the support value of its branch, as in `A{Test}` or `)95{Test}`, and a branch can have only one, so a second label on the same branch, before or after its length, is refused. Text right after a label or a comment, and text before the first parenthesis of a tree, such as a locus name followed by a space instead of a TAB, are refused with a message that says where they are, because they would otherwise be misread. Names and labels cannot contain spaces, so a tip called Homo sapiens must be written `Homo_sapiens`, while spaces between the parts of a tree, as in `(A, B)`, are fine.
+
+In PAML `#0` marks the background, which is the same as no mark, so it gives no label unless `--paml-codes` names it, and a `#0` inside a `$1` clade takes its branch back to the background, as in codeml. The other numbers become labels such as `{1}` until `--paml-codes` gives them names. HyPhy cannot use a number as a label, so the command warns once for the numbers without a name, and in the same way for any label read from the tree that is not a valid label name. The names given with `--paml-codes` are checked like any other label name before a tree is read.
 
 ## Selecting tips
 
