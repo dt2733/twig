@@ -395,7 +395,7 @@ A selector is either a list file or a regular expression. A value that names an 
 
 With `--select-on species` the selectors are matched to the species of each tip, which makes one selection work on gene trees that have several samples per species. The species come from the Taxon Mapping options, which are the same as in [name-map](name-map.md). For example `-d _` takes the part of each name before the first underscore. Without a map file, delimiter or regex, every tip is its own species, and the command says so.
 
-Every label reports how many tips it selected, how many branches it covers, and how many it keeps after precedence, so a label that another label overrode never goes unnoticed. Names or patterns that match no tip are reported too, which helps to find typos.
+Every label reports how many tips it selected, how many branches it covers, and how many keep its label in the end, after precedence, `--leaf-nodes skip` and `--stems`. A label that loses branches to another label, or to a label that the tree already had, says how many and which option decided it, so a label that was overridden never goes unnoticed. Names or patterns that match no tip are reported too, which helps to find typos.
 
 ## Several labels
 

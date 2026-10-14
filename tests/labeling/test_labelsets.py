@@ -302,6 +302,37 @@ class TestPrecedence:
         with pytest.raises(TwigError, match="--precedence error forbids"):
             apply_label_sets(tree, self.SETS, cfg(exact=False, precedence="error"))
 
+    def test_a_branch_that_goes_to_the_same_label_is_not_lost(self):
+        # B is claimed by two sets with the label Test, and a warning used to say that it went to another label
+        tree = fresh(NAMED)
+        result = apply_label_sets(tree, [exact("A", "B", rule="tips"), exact("B", "C", rule="tips")], cfg())
+        assert by_name(tree, result)["B"] == "Test"
+        assert not [w for w in result.warnings if "went to another label" in w]
+        assert [r.kept for r in result.reports] == [2, 1]
+
+    def test_a_branch_lost_to_a_label_in_the_tree_names_the_existing_option(self):
+        tree = fresh("(O,((M1,(A,(B,C)BC{Old})ABC)X,(M2,(D,E)DE)Y)I)R;")
+        result = apply_label_sets(tree, [exact(*DIOECIOUS)], cfg())
+        assert by_name(tree, result)["BC"] == "Old"
+        assert any("label Test: 1 of 7 branches kept the label they had in the input tree because of --existing keep" in w for w in result.warnings)
+        assert not [w for w in result.warnings if "--precedence" in w]
+
+    def test_the_error_names_the_branch_by_its_tips(self):
+        # the branch used to be named by its internal number, such as branch 3
+        tree = fresh(NAMED)
+        sets = [LabelSet("Outer", "stem", ("^[BC]$",)), LabelSet("Inner", "stem", ("^[BC]$",))]
+        with pytest.raises(TwigError, match=r"the labels 'Inner' and 'Outer' claim the same branch above B\+C, which --precedence error forbids"):
+            apply_label_sets(tree, sets, cfg(exact=False, precedence="error"))
+
+    def test_what_a_set_keeps_is_counted_after_skipped_tips_and_stems(self):
+        # the log used to say that Test keeps 7 branches when only BC was left
+        tree = fresh(NAMED)
+        result = apply_label_sets(tree, [exact(*DIOECIOUS)], cfg(stems="unlabel", leaf_nodes="skip"))
+        report = result.reports[0]
+        assert (report.claimed, report.won, report.kept) == (7, 7, 1)
+        result = apply_label_sets(tree, [exact(*DIOECIOUS)], cfg(ambiguous="Unsure", stems="Stem"))
+        assert result.reports[0].kept == 6          # A, B, BC, ABC, D and E, but not DE, which became Stem
+
     def test_existing_labels_have_priority_unless_cleared(self):
         tree = treeio.read_tree("(O,((M1,(A{Old},(B,C))),(M2,(D,E))));")
         sets = [exact("A", "B", rule="tips")]

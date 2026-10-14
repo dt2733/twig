@@ -81,7 +81,12 @@ class LabelingConfig:
 
 @dataclass
 class SetReport:
-    """What happened to one label set on one tree."""
+    """What happened to one label set on one tree.
+
+    `claimed` counts the branches that the rule labeled, `won` those that the
+    set kept after precedence, and `kept` those that still have a label of the
+    set at the end, after tip labels are skipped and stems are handled.
+    """
     name: str
     rule: str
     nuisance: bool
@@ -90,6 +95,7 @@ class SetReport:
     won: int = 0
     cost: Fraction | None = None
     unused: list[str] = field(default_factory=list)
+    kept: int = 0
 
 
 @dataclass
@@ -431,26 +437,36 @@ def apply_label_sets(
     source: dict[int, str] = {}
     winner_set: dict[int, int | None] = {}
     set_won: Counter = Counter()
-    set_lost: Counter = Counter()      # branches lost to another regular set or to labels already in the tree
+    set_lost: Counter = Counter()          # branches lost to another label of a set
+    set_lost_existing: Counter = Counter()  # branches lost to labels already in the tree
     for idx, found in claims.items():
         if config.precedence == "error":
-            others = {c.label for c in found if c.rank[0] >= 2}
+            others = sorted({c.label for c in found if c.rank[0] >= 2})
             if len(others) > 1:
-                raise TwigError(f"branch {idx} is labeled {sorted(others)} by different sets, which --precedence error forbids")
+                named = ", ".join(repr(i) for i in others[:-1]) + f" and {others[-1]!r}"
+                raise TwigError(
+                    f"the labels {named} claim the same branch above {clade_text(tree)[idx]}, which --precedence error forbids"
+                )
         winner = min(found, key=lambda c: c.rank)
         labels[idx], source[idx], winner_set[idx] = winner.label, winner.source, winner.set_index
         if winner.set_index is not None:
             set_won[winner.set_index] += 1
-        # a nuisance label is meant to win, so losing to it is not worth a warning
+        # a nuisance label is meant to win, so losing to it is not worth a warning,
+        # and neither is losing to the same label
         if winner.rank[0] != 0:
             for claim in found:
-                if claim.set_index is not None and claim.set_index != winner.set_index:
-                    set_lost[claim.set_index] += 1
+                if claim.set_index is not None and claim.set_index != winner.set_index and claim.label != winner.label:
+                    (set_lost if winner.set_index is not None else set_lost_existing)[claim.set_index] += 1
     for number, report in enumerate(reports):
         report.won = set_won[number]
         if set_lost[number]:
             warnings.append(
                 f"label {report.name}: {set_lost[number]} of {report.claimed} branches went to another label because of --precedence {config.precedence}"
+            )
+        if set_lost_existing[number]:
+            warnings.append(
+                f"label {report.name}: {set_lost_existing[number]} of {report.claimed} branches kept the label they had in the input tree "
+                "because of --existing keep"
             )
 
     # branches labeled by a regular set, which means not by a nuisance set and not already in the tree
@@ -511,5 +527,10 @@ def apply_label_sets(
             if labels[node.idx] is None and node.idx not in held:
                 labels[node.idx], source[node.idx] = config.background, "background"
                 counts["background"] += 1
+
+    # what each set keeps in the end, which is less than it won when tips are skipped or stems changed
+    for number, (item, report) in enumerate(zip(sets, reports)):
+        own = (f"{item.name}:{item.rule}", "ambiguous")
+        report.kept = sum(1 for idx, owner in winner_set.items() if owner == number and labels.get(idx) and source.get(idx) in own)
 
     return LabelingResult(labels, source, kind, reports, warnings, counts)

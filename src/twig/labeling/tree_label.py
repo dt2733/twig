@@ -127,7 +127,7 @@ def describe(result: LabelingResult, locus: str) -> list[str]:
         kind = f"{report.rule}, nuisance" if report.nuisance else report.rule
         line = (
             f"{locus}: label {report.name} ({kind}) selected {_count(report.selected, 'tip')}, "
-            f"covers {_count(report.claimed, 'branch')} and keeps {report.won}"
+            f"covers {_count(report.claimed, 'branch')} and keeps {report.kept}"
         )
         if report.cost is not None:
             line += f", parsimony cost {report.cost}"

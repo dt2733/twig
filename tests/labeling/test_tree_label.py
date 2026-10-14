@@ -66,6 +66,10 @@ class TestRulesOnTheDesignedSpeciesTree:
         _, _, err = run(f"-i {NAMED} -L Test {DIOECIOUS} --rule fitch")
         assert "label Test (fitch) selected 4 tips, covers 7 branches and keeps 7, parsimony cost 3" in err
 
+    def test_the_log_counts_what_a_label_keeps_in_the_end(self, run):
+        _, _, err = run(f"-i {NAMED} -L Test {DIOECIOUS} --rule fitch --stems unlabel --leaf-nodes skip")
+        assert "label Test (fitch) selected 4 tips, covers 7 branches and keeps 1, parsimony cost 3" in err
+
     def test_the_rule_can_be_given_to_one_label(self, run):
         _, out, _ = run(f"-i {NAMED} -L Test:fitch {DIOECIOUS} --internal-names keep")
         assert set(labeled_names(out)) == {"A", "B", "BC", "ABC", "D", "E", "DE"}
