@@ -1,6 +1,7 @@
 """Tests for how the labeling commands live inside twig."""
 
 import importlib
+import re
 import subprocess
 import sys
 from argparse import ArgumentParser
@@ -13,6 +14,24 @@ from twig.labeling.core import constants
 from twig.labeling.core.model import Status
 
 COMMANDS = ["name-map", "sample-reduce", "tree-label", "tree-label-transfer"]
+
+
+def writing_problems(text: str) -> list[str]:
+    """Return the lines of help text with a colon or a dash that the writing rules forbid.
+
+    The rules are no em-dashes, no en-dashes and no colons in prose. Colons are
+    allowed in the lines that argparse makes (usage and group titles), in command
+    lines that start with a dollar sign, in Newick output and in tables.
+    """
+    found = []
+    for line in text.splitlines():
+        if line.startswith("usage: ") or (line.endswith(":") and not line.startswith(" ")):
+            continue
+        if line.startswith("$ ") or "\t" in line or re.match(r"^\(.*\);$", line):
+            continue
+        if ":" in line or "\u2014" in line or "\u2013" in line:
+            found.append(line.strip())
+    return found
 
 
 def run_python(code: str) -> subprocess.CompletedProcess:
@@ -111,21 +130,36 @@ class TestParsers:
         parsers.add_taxon_mapping_args(parser, unmapped=False)
         assert not hasattr(parser.parse_args([]), "unmapped")
 
-    def test_help_text_has_no_em_dashes_and_no_prose_colons(self):
+    def test_help_text_has_no_dashes_and_no_prose_colons(self):
         for name in COMMANDS:
             parser = getattr(parsers, f"get_parser_{name.replace('-', '_')}")()
-            text = parser.format_help()
-            assert "—" not in text
-            for line in text.splitlines():
-                if line.startswith((" ", "-", "|")) and ":" in line:
-                    assert False, f"colon in help line of {name}: {line!r}"
+            assert writing_problems(parser.format_help()) == [], name
+
+    def test_the_writing_check_finds_what_it_is_meant_to_find(self):
+        text = "\n".join([
+            "usage: tree-label [options]",
+            "Input/Output:",
+            "  -i, --input path   fine words",
+            "  -o, --out path     a colon: here",
+            "# a comment with a colon: here",
+            "# a comment with an em\u2014dash",
+            "A line with an en\u2013dash",
+            "$ twig tree-label -L Test:fitch dioecious.txt",
+            "(A{Test},B);",
+            "A\tB: tabs mean a table",
+        ])
+        found = writing_problems(text)
+        assert [line.split(" ")[0] for line in found] == ["-o,", "#", "#", "A"]
 
 
 class TestCommandLine:
-    def test_twig_help_lists_the_new_commands(self, run_twig):
+    def test_twig_help_lists_the_new_commands(self, run_twig, capsys):
         with pytest.raises(SystemExit) as info:
             run_twig("-h")
         assert info.value.code == 0
+        out = capsys.readouterr().out
+        for name in COMMANDS:
+            assert re.search(rf"^\s+{re.escape(name)}\s", out, re.M), name
 
     def test_twig_help_text(self, capsys):
         from twig.cli.main import main
