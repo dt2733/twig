@@ -14,7 +14,7 @@ from conftest import DATA, LABELED, SPECIES
 NAMED = DATA / "species.named.nwk"          # (O,((M1,(A,(B,C)BC)ABC)X,(M2,(D,E)DE)Y)Z);
 DIOECIOUS = DATA / "dioecious.txt"          # A, B, D and E
 
-# the labeled species tree written for HyPhy: the two branches at the root become one
+# the labeled species tree written for HyPhy, where the two branches at the root become one
 UNROOTED = (
     "(O{Reference},(M1{Reference},(A{Test},(B{Test},C{Rev}){Test})){Reference},"
     "(M2{Reference},(D{Test},E{Test})){Reference});"

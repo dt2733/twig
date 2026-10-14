@@ -602,7 +602,7 @@ twig tree-label -i gene.nwk -L Test dioecious.txt --select-on species -d _ --rul
 (O_1:0.18,(M1_1:0.2,(A_1{Test}:0.05,A_2{Test}:0.04,(B_1{Test}:0.1,C_1:0.12)twn1:0.02)twn2:0.03)twn3:0.04,(M2_1:0.2,(D_1{Test}:0.1,E_1{Test}:0.11)twn4{Test}:0.03)twn5:0.05);
 ```
 
-In this gene tree A has two samples. The selector A matched the species of each tip, so both samples are labeled, and the branch above O has the summed length 0.12 and 0.06.
+In this gene tree A has two samples. The selector A matched the species of each tip, so both samples are labeled. The two branches at the root, which are 0.12 and 0.06 long in the input, are written as one branch above `O_1` with the summed length 0.18.
 
 ## The branch table
 
