@@ -16,6 +16,7 @@ from twig.labeling.core.labelsets import (
     parse_label_args,
     read_spec,
     select_tips,
+    unused_settings,
 )
 from twig.labeling.core.newick import to_newick
 from conftest import LABELED, SPECIES
@@ -445,6 +446,24 @@ class TestWarningsAndErrors:
         item = LabelSet("Test", "fitch", DIOECIOUS, ambiguous="Deltran")
         with pytest.raises(TwigError, match="ambiguous=Deltran of the label 'Test' would be read as a label name"):
             apply_label_sets(fresh(), [item], cfg())
+
+    def test_parsimony_options_without_a_fitch_label_are_reported(self):
+        # they used to be accepted and ignored without a word
+        config = cfg(losses="Rev", ambiguous="Amb", gain_cost=Fraction(5), unknown=("C",))
+        assert unused_settings([exact(*DIOECIOUS, rule="all")], config) == [
+            "no label uses the fitch rule, so --losses, --ambiguous, --gain-cost and --unknown have no effect"
+        ]
+        assert unused_settings([exact(*DIOECIOUS, rule="all"), exact("A")], config) == []
+        assert unused_settings([exact(*DIOECIOUS, rule="all")], cfg()) == []
+        assert unused_settings([], cfg(root_state="1")) == ["no label uses the fitch rule, so --root-state has no effect"]
+        with_options = LabelSet("Test", "all", DIOECIOUS, ambiguous="deltran", gain_cost=Fraction(2))
+        assert unused_settings([with_options], cfg()) == [
+            "label Test: the all rule is not fitch, so ambiguous= and gain-cost= have no effect"
+        ]
+
+    def test_unknown_tips_that_match_nothing_are_reported(self):
+        result = apply_label_sets(fresh(), [exact(*DIOECIOUS)], cfg(unknown=("Cx",)))
+        assert any("--unknown has 1 listed names or patterns that match no tip (Cx)" in w for w in result.warnings)
 
     def test_costs_cannot_both_be_zero(self):
         # every history would cost nothing, and acctran used to give an arbitrary alternating labeling

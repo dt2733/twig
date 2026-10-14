@@ -279,6 +279,43 @@ def check_settings(sets: Sequence[LabelSet], config: LabelingConfig) -> None:
             )
 
 
+def unused_settings(sets: Sequence[LabelSet], config: LabelingConfig) -> list[str]:
+    """Return warnings for settings that no label set uses.
+
+    The parsimony options act only on labels with the fitch rule, so they are
+    named when they differ from their defaults and no label uses fitch, and the
+    options of a spec line are named when its rule is not fitch. This needs no
+    tree, so a command can report them once before it reads anything.
+    """
+    def listed(items: list[str]) -> str:
+        return ", ".join(items[:-1]) + (" and " if len(items) > 1 else "") + items[-1]
+
+    out = []
+    default = LabelingConfig()
+    if not any(item.rule == "fitch" for item in sets):
+        given = [
+            option for option, changed in (
+                ("--losses", config.losses != default.losses),
+                ("--ambiguous", config.ambiguous != default.ambiguous),
+                ("--gain-cost", config.gain_cost != default.gain_cost),
+                ("--loss-cost", config.loss_cost != default.loss_cost),
+                ("--unknown", bool(config.unknown)),
+                ("--root-state", config.root_state != default.root_state),
+            ) if changed
+        ]
+        if given:
+            out.append(f"no label uses the fitch rule, so {listed(given)} {'has' if len(given) == 1 else 'have'} no effect")
+    for item in sets:
+        given = [
+            option for option, value in (
+                ("ambiguous=", item.ambiguous), ("gain-cost=", item.gain_cost), ("loss-cost=", item.loss_cost),
+            ) if value is not None
+        ]
+        if item.rule != "fitch" and given:
+            out.append(f"label {item.name}: the {item.rule} rule is not fitch, so {listed(given)} {'has' if len(given) == 1 else 'have'} no effect")
+    return out
+
+
 def _find_stems(
     tree,
     sets: Sequence[LabelSet],
@@ -386,7 +423,9 @@ def apply_label_sets(
         groups.append(tuple(pieces))
         reports.append(report)
 
-    unknown, _ = select_tips(tree, config.unknown, config.exact, config.select_on, species_of) if config.unknown else (frozenset(), [])
+    unknown, unused = select_tips(tree, config.unknown, config.exact, config.select_on, species_of) if config.unknown else (frozenset(), [])
+    if unused:
+        warnings.append(f"--unknown has {len(unused)} listed names or patterns that match no tip ({', '.join(unused[:5])}{' ...' if len(unused) > 5 else ''})")
     unknown = frozenset(unknown) | frozenset(i for item, sel in zip(sets, selections) if item.nuisance for i in sel)
 
     # every claim on a branch, with a rank where lower ranks win

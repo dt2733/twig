@@ -34,6 +34,7 @@ from twig.labeling.core.labelsets import (
     nuisance_set,
     parse_label_args,
     read_spec,
+    unused_settings,
 )
 from twig.labeling.core.names import NameMapper
 from twig.labeling.core.parsimony import to_fraction
@@ -156,6 +157,8 @@ def run_tree_label(args) -> None:
     sets = build_label_sets(args)
     config = build_config(args)
     check_settings(sets, config)
+    for message in unused_settings(sets, config):
+        logger.warning(message)
     writer = writers.get_writer(args.format)
     rooting.check_root_edge_policy(args.root_edges)
     check_outputs(args)

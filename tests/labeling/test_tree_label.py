@@ -429,6 +429,12 @@ class TestSeveralLabels:
         _, _, err = run(f"-i {NAMED} -L Test A --select-on species --rule tips")
         assert "every tip is its own species" in err
 
+    def test_parsimony_options_that_change_nothing_are_reported(self, run):
+        code, _, err = run(f"-i {NAMED} -L Test:all {DIOECIOUS} --losses Rev --ambiguous Amb --gain-cost 5")
+        assert code == 0 and "no label uses the fitch rule, so --losses, --ambiguous and --gain-cost have no effect" in err
+        _, _, err = run(f"-i {NAMED} -L Test:fitch {DIOECIOUS} --unknown Cx")
+        assert "--unknown has 1 listed names or patterns that match no tip" in err and "no effect" not in err
+
     def test_an_unknown_tip_takes_the_state_of_the_history_inferred_from_the_other_tips(self, run):
         _, out, _ = run(f"-i {NAMED} -L Test {DIOECIOUS} --rule fitch --unknown C --internal-names keep")
         assert labeled_names(out)["BC"] == "Test" and labeled_names(out)["C"] == "Test"
