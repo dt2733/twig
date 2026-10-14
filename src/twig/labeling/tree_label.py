@@ -194,6 +194,7 @@ def run_tree_label(args) -> None:
 
     pieces: list[str] = []
     table_pieces: list[str] = []
+    seen_labels: set[str] = set()
     for number, (locus, newick, path) in enumerate(records):
         parsed = treeio.parse_newick(newick, "auto", paml_codes, source=f"{path} ({locus})")
         tree = parsed.tree
@@ -219,6 +220,7 @@ def run_tree_label(args) -> None:
         for message in result.warnings:
             logger.warning(f"{locus}: {message}")
         labeled = treeio.set_labels(tree, result.labels, inplace=True)
+        seen_labels.update(i for i in result.labels.values() if i)
         if not any(result.labels.values()):
             logger.warning(f"{locus}: no branch is labeled")
         logger.info(summarize(result.labels, result, locus))
@@ -251,6 +253,10 @@ def run_tree_label(args) -> None:
             heading = [f"tree {locus}"] if len(records) > 1 else []
             sys.stderr.write("\n".join(heading + display.branch_listing(
                 labeled, result.labels, result.kind, result.source, species_of)) + "\n")
+
+    missing = rooting.missing_policy_label(args.root_edges, seen_labels)
+    if missing:
+        logger.warning(missing)
 
     text = "\n".join(pieces) + "\n"
     if args.branch_table:

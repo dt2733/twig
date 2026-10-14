@@ -302,6 +302,20 @@ class TestRootEdgesAndRooting:
         code, _, err = run(f"-i {distinct} --root-edges bad-name")
         assert code == 1 and "unknown root edge policy" in err
 
+    def test_a_misspelled_policy_is_refused_before_any_tree_is_read(self, run, tmp_path):
+        # outgrup was taken as a label name that no branch has, and the merged branch silently got no label
+        for policy in ("outgrup", "Outgroup"):
+            code, out, err = run(f"-i {tmp_path / 'nothing.nwk'} -F hyphy --root-edges {policy}")
+            assert code == 1 and out == "" and "looks like" in err and "'outgroup'" in err
+            assert "cannot read tree file" not in err and "Traceback" not in err
+
+    def test_a_policy_label_that_no_branch_has_gives_a_warning(self, run, distinct):
+        code, out, err = run(f"-i {distinct} -F hyphy --root-edges Q")
+        assert code == 0 and out.startswith("(O:2,")
+        assert "--root-edges names the label Q, which no branch has" in err
+        _, _, err = run(f"-i {distinct} -F hyphy --root-edges Z")
+        assert "which no branch has" not in err
+
     def test_reroot_on_an_outgroup_before_labeling(self, run, tmp_path):
         tree = tmp_path / "unrooted.nwk"
         tree.write_text("((M1,(A,(B,C))),(M2,(D,E)),O);")

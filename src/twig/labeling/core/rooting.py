@@ -32,16 +32,65 @@ from twig.labeling.core.model import RootMerge
 from twig.labeling.core.sanitize import label_name_problem
 
 
+def _one_edit_apart(a: str, b: str) -> bool:
+    """Return True if one inserted, removed or changed letter, or two swapped neighbors, turn a into b."""
+    if a == b or abs(len(a) - len(b)) > 1:
+        return False
+    if len(a) > len(b):
+        a, b = b, a
+    start = next((i for i, (x, y) in enumerate(zip(a, b)) if x != y), len(a))
+    if len(a) < len(b):
+        return a[start:] == b[start + 1:]
+    if a[start + 1:] == b[start + 1:]:
+        return True
+    return a[start:start + 2] == b[start:start + 2][::-1] and a[start + 2:] == b[start + 2:]
+
+
 def check_root_edge_policy(policy: str) -> str:
-    """Return the policy if it is a keyword or a valid label name, else raise."""
+    """Return the policy if it is a keyword or a valid label name, else raise.
+
+    A label name that is a keyword written in another case, or a keyword with
+    one letter wrong, is refused, because as a label that no branch has it
+    would silently give the merged branch no label.
+    """
     if policy in ROOT_EDGE_POLICIES:
         return policy
     problem = label_name_problem(policy)
+    for keyword in ROOT_EDGE_POLICIES:
+        if policy.lower() == keyword:
+            raise TwigError(
+                f"the root edge policy {policy!r} would be read as a label name, but it looks like {keyword!r}. "
+                f"Policies are written in lower case, so give {keyword} or choose another label name"
+            )
+        if not problem and _one_edit_apart(policy.lower(), keyword):
+            raise TwigError(
+                f"the root edge policy {policy!r} would be read as a label name, but it looks like a misspelling "
+                f"of {keyword!r}. Give {keyword} or choose another label name"
+            )
     if problem:
         raise TwigError(
             f"unknown root edge policy {policy!r}, use one of {list(ROOT_EDGE_POLICIES)} or the name of a label"
         )
     return policy
+
+
+def missing_policy_label(policy: str, labels: Iterable[str]) -> str | None:
+    """Return a warning if the policy names a label that no branch has, else None.
+
+    Such a policy gives no label to a merged branch whose two halves differ, as
+    unlabel does, which is most likely not what was meant.
+    """
+    labels = set(labels)
+    if policy in ROOT_EDGE_POLICIES or policy in labels or not labels:
+        return None
+    message = (
+        f"--root-edges names the label {policy}, which no branch has, so a merged root branch whose two "
+        "halves differ gets no label, as with unlabel. Check the spelling"
+    )
+    alike = sorted(i for i in labels if i.lower() == policy.lower())
+    if alike:
+        message += f", or give {alike[0]}, which differs only in case"
+    return message
 
 
 def merge_root_labels(

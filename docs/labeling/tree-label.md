@@ -92,7 +92,7 @@ Taxon Mapping:
 Output Format:
   --root-edges str                 HyPhy and PAML read a rooted tree as unrooted and see the two branches at its root as one branch. This sets the label of that branch (unlabel, labeled, outgroup, ingroup, error).
                                    unlabel gives no label if the two branches differ, labeled uses the only label there is, outgroup and ingroup use the label of that side, error stops, and a label name wins if either
-                                   branch has it [unlabel]
+                                   branch has it. A name that looks like one of the values in another case or with a letter wrong is refused [unlabel]
   --keep-root                      write the tree rooted as it is, without joining the two branches at the root
   --internal-names str             names written after internal nodes (none, auto, support, keep). none writes labels only, auto writes twn1, twn2 and so on, support writes the support values, and keep writes the names
                                    the tree had [none]
@@ -513,6 +513,8 @@ HyPhy and PAML read every tree as unrooted. A rooted tree has two branches at it
 | `ingroup` | the label of the branch on the side of the ingroup |
 | `error` | none, the run stops if the labels differ |
 | a label name | that label if either branch carries it |
+
+A label name that looks like one of the values above, written in another case or with one letter wrong, such as `Outgroup` or `outgrup`, is refused. A label name that no branch has gives a warning, because the joined branch then gets no label, as with `unlabel`.
 
 On the species tree of this page the two branches at the root are O and the whole ingroup, and in the labeled tree both are Reference, so the joined branch is Reference. In the next tree they differ, with X on O and Z on the ingroup.
 

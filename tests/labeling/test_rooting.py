@@ -74,6 +74,37 @@ class TestMergeRootLabels:
         with pytest.raises(TwigError, match="unknown root edge policy"):
             rooting.check_root_edge_policy(policy)
 
+    @pytest.mark.parametrize("policy, keyword", [("Outgroup", "outgroup"), ("UNLABEL", "unlabel"), ("Labeled", "labeled"), ("Error", "error")])
+    def test_a_policy_written_in_another_case_is_refused(self, policy, keyword):
+        with pytest.raises(TwigError, match=f"looks like '{keyword}'. Policies are written in lower case"):
+            rooting.check_root_edge_policy(policy)
+
+    @pytest.mark.parametrize("policy, keyword", [
+        ("outgrup", "outgroup"), ("ingroups", "ingroup"), ("ignroup", "ingroup"), ("unlabl", "unlabel"), ("Eror", "error"),
+    ])
+    def test_a_misspelled_policy_is_refused(self, policy, keyword):
+        # these were taken as label names that no branch has, which gave the merged branch no label
+        with pytest.raises(TwigError, match=f"looks like a misspelling of '{keyword}'"):
+            rooting.check_root_edge_policy(policy)
+
+    @pytest.mark.parametrize("policy", ["Test", "Reference", "Out", "Z", "outgroup", "error"])
+    def test_keywords_and_label_names_are_accepted(self, policy):
+        assert rooting.check_root_edge_policy(policy) == policy
+
+    def test_a_label_that_no_branch_has_gives_a_warning(self):
+        message = rooting.missing_policy_label("Refrence", {"Test", "Reference"})
+        assert message.startswith("--root-edges names the label Refrence, which no branch has") and "Check the spelling" in message
+        assert rooting.missing_policy_label("ref", {"Ref"}).endswith("Check the spelling, or give Ref, which differs only in case")
+        assert rooting.missing_policy_label("Ref", {"Ref", "Test"}) is None
+        assert rooting.missing_policy_label("outgroup", {"Ref"}) is None
+        assert rooting.missing_policy_label("Ref", set()) is None          # nothing to choose between
+
+    def test_one_edit_apart(self):
+        assert rooting._one_edit_apart("outgrup", "outgroup") and rooting._one_edit_apart("outgroup", "outgrup")
+        assert rooting._one_edit_apart("errer", "error") and rooting._one_edit_apart("ignroup", "ingroup")
+        assert not rooting._one_edit_apart("error", "error") and not rooting._one_edit_apart("outgroup", "ingroup")
+        assert not rooting._one_edit_apart("rerro", "error") and not rooting._one_edit_apart("Test", "error")
+
 
 class TestPlanRootMerge:
     def test_equal_labels_at_the_root_of_the_designed_tree(self):
