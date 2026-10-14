@@ -74,6 +74,14 @@ class TestSniff:
         path.write_text(text)
         assert batch.sniff_kind(path) == kind
 
+    def test_a_byte_order_mark_and_a_comment_after_the_locus_are_fine(self, tmp_path):
+        # a tree file saved with a byte order mark was neither a tree file nor a FASTA file
+        path = tmp_path / "x"
+        path.write_bytes(b"\xef\xbb\xbf(A,B);\n")
+        assert batch.sniff_kind(path) == "tree"
+        path.write_text("OG0001\t[&R] (A,B);\n")
+        assert batch.sniff_kind(path) == "tree"
+
 
 class TestLoci:
     @pytest.mark.parametrize("name, locus", [

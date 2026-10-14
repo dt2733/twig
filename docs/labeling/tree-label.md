@@ -389,6 +389,10 @@ $ twig tree-label -i roots.nwk -F hyphy --keep-root
 (A{X}:1,(B{Y}:1,C{Y}:1){Z}:1);
 ```
 
+## Reading trees
+
+The input holds one or more Newick trees, and a tree can span several lines. Blank lines, comment lines that start with `#` and a PAML header with the number of species and trees are skipped, a line can start with a locus name and a TAB, and a byte order mark at the start of the file, which some Windows editors add, is ignored. NEXUS files and quoted names are not supported. Labels can be written in braces as HyPhy writes them, as PAML marks such as `#1` and `$1`, or as the `label` key of NHX and FigTree annotations. A label goes after the name or the support value of its branch, as in `A{Test}` or `)95{Test}`. Text right after a label or a comment, and text before the first parenthesis of a tree, such as a locus name followed by a space instead of a TAB, are refused with a message that says where they are, because they would otherwise be misread.
+
 ## Selecting tips
 
 A selector is either a list file or a regular expression. A value that names an existing file is read as a list with one name per line, where a line that starts with `~` is a regular expression and a line that starts with `#` is a comment. Any other value is a regular expression that is matched with `re.search`, so `A` matches every name that contains an A. The option `--exact` treats the values given on the command line as exact names, and `--invert` labels the tips that the selectors do not match.

@@ -54,7 +54,10 @@ _TOKEN = re.compile(
     r"|(?P<text>[^()\[\]{},:;#$\s]+)"
 )
 _PAML_HEADER = re.compile(r"^\s*\d+\s+\d+\s*$")
-_LOCUS_PREFIX = re.compile(r"^([^\s(\[;]+)\t+(\(.*)$")
+# a locus name, a TAB, and the tree, which may start with comments such as [&R]
+_LOCUS_PREFIX = re.compile(r"^([^\s(\[;]+)\t+((?:\[[^\]]*\]\s*)*\(.*)$")
+# lines of a NEXUS file, which can come without the #NEXUS header
+_NEXUS_LINE = re.compile(r"^(#NEXUS\b|begin\s+\w+\s*;|u?tree\s+(\*\s*)?[^\s=(\[]+\s*=)", re.IGNORECASE)
 _NUMBER = r"[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?"
 _IS_NUMBER = re.compile(rf"^{_NUMBER}$")
 _IS_DOUBLE_SUPPORT = re.compile(rf"^({_NUMBER})/({_NUMBER})$")
@@ -127,7 +130,7 @@ def deep_recursion(tree: "ToyTree"):
 def _read_text(path: str | Path) -> str:
     path = Path(path)
     try:
-        return path.read_text(encoding="utf-8")
+        return path.read_text(encoding="utf-8-sig")       # utf-8-sig drops a byte order mark
     except OSError as exc:
         raise TwigError(f"cannot read tree file {path}: {exc}") from exc
     except UnicodeDecodeError as exc:
@@ -161,10 +164,10 @@ def iter_trees_text(text: str, source: str = "<text>") -> Iterator[tuple[str | N
     lines and several trees can share a line. Blank lines, `#` comment lines
     between trees and a PAML `ns ntree` header are skipped, and a line can have
     the form `locus<TAB>newick`. The locus is None otherwise. NEXUS input is not
-    supported.
+    supported, and a byte order mark at the start of the text is ignored.
     """
-    if text.lstrip()[:6].upper() == "#NEXUS":
-        raise TwigError(f"{source}: NEXUS format is not supported, convert the trees to plain Newick")
+    if text.startswith("\ufeff"):
+        text = text[1:]
     pieces: list[str] = []
     in_tree = False     # the tree in progress has some text
     locus: str | None = None
@@ -173,6 +176,8 @@ def iter_trees_text(text: str, source: str = "<text>") -> Iterator[tuple[str | N
     for line in text.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
         stripped = line.strip()
         if not in_tree:
+            if _NEXUS_LINE.match(stripped):
+                raise TwigError(f"{source}: NEXUS format is not supported, convert the trees to plain Newick")
             if not stripped or stripped.startswith("#"):
                 continue
             if number == 0 and _PAML_HEADER.match(stripped):
@@ -210,15 +215,39 @@ def iter_trees(path: str | Path) -> Iterator[tuple[str | None, str]]:
 ###########################################################################
 
 def _tokens(newick: str) -> Iterator[tuple[str, str, int]]:
-    """Yield (kind, text, position) for each token, skipping whitespace."""
-    pos, size = 0, len(newick)
+    """Yield (kind, text, position) for each token, skipping whitespace.
+
+    Text that toytree would misread is an error. A tree cannot have text before
+    its first `(`, and a name or support value cannot follow a label or a
+    comment directly, because toytree would glue it to the annotation.
+    """
+    pos, size = int(newick.startswith("\ufeff")), len(newick)     # a byte order mark is skipped
+    last = None             # kind of the last token that is not whitespace
+    leading = None          # (text, position) of text before the first (
+    opened = False
     while pos < size:
         found = _TOKEN.match(newick, pos)
         if found is None:
             raise TwigError(f"unexpected character {newick[pos]!r} at position {pos} of the tree")
-        kind = found.lastgroup
+        kind, token = found.lastgroup, found.group()
+        if kind == "text":
+            if last in ("brace", "mark", "comment"):
+                raise TwigError(
+                    f"unexpected text {token!r} at position {pos} of the tree, after a label or comment. "
+                    "A label goes after the name or support value, as in A{Test} or )95{Test}"
+                )
+            if not opened and leading is None:
+                leading = (token, pos)
+        elif kind == "punct" and token == "(" and not opened:
+            if leading is not None:
+                raise TwigError(
+                    f"unexpected text {leading[0]!r} at position {leading[1]} of the tree, before its first '('. "
+                    "A line can start with a locus name and a TAB, and NEXUS files are not supported"
+                )
+            opened = True
         if kind != "space":
-            yield kind, found.group(), pos
+            yield kind, token, pos
+            last = kind
         pos = found.end()
 
 
@@ -492,10 +521,28 @@ def _paml_labels(tree: "ToyTree", codes: Mapping[int | str, str] | None) -> None
         own_clade = node.__dict__.pop(_TMP_CLADE, None)
         own_mark = node.__dict__.pop(_TMP_PAML, None)
         inherited = clade_of[node.up.idx] if node.up is not None else None
-        clade = int(own_clade) if own_clade is not None else inherited
+        clade = _stored_number(own_clade, node) if own_clade is not None else inherited
         clade_of[node.idx] = clade
-        mark = int(own_mark) if own_mark is not None else clade
+        mark = _stored_number(own_mark, node) if own_mark is not None else clade
         node.label = None if mark is None else names.get(str(mark), str(mark))
+
+
+def _table_labels(tree: "ToyTree", labels: list[str]) -> None:
+    """Set `label` from the numbers that the rewrite stored, which index the table of labels."""
+    for node in tree:
+        slot = node.__dict__.pop(_TMP_LABEL, None)
+        number = None if slot is None else _stored_number(slot, node)
+        if number is not None and not 0 <= number < len(labels):
+            raise TwigError(f"cannot read the label of the node {node.name or node.idx!r}, toytree read it as {slot!r}")
+        node.label = None if number is None else labels[number]
+
+
+def _stored_number(value, node) -> int:
+    """Return the number that the rewrite stored on a node, or raise if toytree changed it."""
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        raise TwigError(f"cannot read the label of the node {node.name or node.idx!r}, toytree read it as {value!r}") from None
 
 
 def parse_newick(
@@ -518,12 +565,13 @@ def parse_newick(
 
     # labels stored by the rewrite -> the `label` feature
     syntax = next(iter(rewritten.syntaxes), None)
-    if syntax == "paml":
-        _paml_labels(tree, paml_codes)
-    else:
-        for node in tree:
-            slot = node.__dict__.pop(_TMP_LABEL, None)
-            node.label = None if slot is None else rewritten.labels[int(slot)]
+    try:
+        if syntax == "paml":
+            _paml_labels(tree, paml_codes)
+        else:
+            _table_labels(tree, rewritten.labels)
+    except TwigError as exc:
+        raise TwigError(f"{source}: {exc}") from None
     root_label = tree.treenode.label
     tree.treenode.label = None
 

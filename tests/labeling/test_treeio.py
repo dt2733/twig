@@ -74,6 +74,32 @@ class TestIterTrees:
         with pytest.raises(TwigError, match="not valid UTF-8"):
             list(treeio.iter_trees(bad))
 
+    def test_a_byte_order_mark_is_ignored(self, tmp_path):
+        # the mark stayed in the text, so toytree read the whole tree as one tip
+        path = tmp_path / "bom.nwk"
+        path.write_bytes(b"\xef\xbb\xbf((A,B),C);\n")
+        assert list(treeio.iter_trees(path)) == [(None, "((A,B),C);")]
+        assert list(treeio.iter_trees_text("\ufeff((A,B),C);\n")) == [(None, "((A,B),C);")]
+        assert [n.name for n in treeio.read_tree(path) if n.is_leaf()] == ["A", "B", "C"]
+        assert treeio.tip_names("\ufeff((A,B),C);") == ["A", "B", "C"]
+
+    @pytest.mark.parametrize("text", [
+        "#NEXUS\nbegin trees;\n",
+        "\ufeff#NEXUS\nbegin trees;\ntree t1 = ((A,B),C);\nend;\n",
+        "begin trees;\ntree t1 = ((A,B),C);\nend;\n",
+        "tree t1 = ((A,B),C);\n",
+        "TREE * t1 = [&U] ((A,B),C);\n",
+    ])
+    def test_nexus_is_refused_with_a_byte_order_mark_or_without_its_header(self, text):
+        # these were split into trees such as 'treet1=((A,B),C);', which toytree read as a single tip
+        with pytest.raises(TwigError, match="NEXUS format is not supported"):
+            list(treeio.iter_trees_text(text))
+
+    def test_a_locus_name_can_be_followed_by_a_comment_before_the_tree(self):
+        assert list(treeio.iter_trees_text("L1\t[&R] ((A,B),C);\n")) == [("L1", "[&R]((A,B),C);")]
+        # a locus named tree is not taken for NEXUS
+        assert list(treeio.iter_trees_text("tree\t((A[&&NHX:S=x],B),C);\n")) == [("tree", "((A[&&NHX:S=x],B),C);")]
+
 
 ###########################################################################
 # tip names without toytree
@@ -97,6 +123,9 @@ class TestTipNames:
         ("(A,B){unclosed;", "unexpected character"),
         ("(A#x,B);", "unexpected character"),
         ("A,", "tip without a name"),
+        ("treet1=((A,B),C);", "unexpected text 'treet1=' at position 0 of the tree, before its first"),
+        ("locus1((A,B),C);", "unexpected text 'locus1' at position 0 of the tree, before its first"),
+        ("((A{Test}x,B),C);", "unexpected text 'x' at position 9 of the tree, after a label or comment"),
     ])
     def test_errors(self, newick, message):
         with pytest.raises(TwigError, match=message):
@@ -293,6 +322,37 @@ class TestLabelSyntaxes:
             treeio.read_tree("(A #1 $2,B);")
         # one annotation on the node and one on its edge is fine
         assert treeio.read_tree("(A{Test}:0.1[&x=1],B);")[0].label == "Test"
+
+    @pytest.mark.parametrize("newick, text", [
+        ("((A{Test},B){Test}95,C);", "95"),
+        ("((A{Test}x,B),C);", "x"),
+        ("((A#1x,B),C);", "x"),
+        ("((Pop#12a,B),C);", "a"),
+        ("((A[&label=Test]x,B),C);", "x"),
+        ("((A,B)[&x=1]95,C);", "95"),
+    ])
+    def test_text_right_after_a_label_or_comment_is_a_clear_error(self, newick, text):
+        # toytree glued the text to the annotation, which ended in a ValueError or in a lost support value
+        with pytest.raises(TwigError, match=f"unexpected text '{text}' at position \\d+ of the tree, after a label or comment"):
+            treeio.parse_newick(newick)
+
+    @pytest.mark.parametrize("newick", ["tree t1=((A,B),C);", "locus1 ((A,B),C);"])
+    def test_text_before_the_tree_is_a_clear_error(self, newick):
+        with pytest.raises(TwigError, match="before its first '\\('"):
+            treeio.parse_newick(newick)
+
+    def test_a_single_tip_and_a_leading_comment_are_fine(self):
+        assert [n.name for n in treeio.parse_newick("A;").tree] == ["A"]
+        assert [n.name for n in treeio.parse_newick("[&R]((A,B),C);").tree if n.is_leaf()] == ["A", "B", "C"]
+
+    def test_a_label_number_that_toytree_changed_is_a_clear_error(self):
+        tree = treeio.read_tree("((A,B),C);")
+        tree[0].twiglab = "0]9"
+        with pytest.raises(TwigError, match="cannot read the label of the node 'A'"):
+            treeio._table_labels(tree, ["Test"])
+        tree[0].twigpaml = "1]"
+        with pytest.raises(TwigError, match="cannot read the label of the node 'A'"):
+            treeio._paml_labels(tree, None)
 
     def test_empty_labels_and_quotes(self):
         with pytest.raises(TwigError, match="empty label"):

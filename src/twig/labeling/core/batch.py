@@ -77,14 +77,14 @@ def expand_inputs(items: Iterable[str | Path]) -> list[Path]:
 
 
 _TREE_START = re.compile(r"^(\[[^\]]*\]\s*)*\(")
-_TREE_WITH_LOCUS = re.compile(r"^[^\s(\[;]+\t+\(")
+_TREE_WITH_LOCUS = re.compile(r"^[^\s(\[;]+\t+(\[[^\]]*\]\s*)*\(")
 _PAML_HEADER = re.compile(r"^\d+\s+\d+$")
 
 
 def sniff_kind(path: str | Path) -> str:
     """Return `fasta`, `tree` or `unknown` from the first lines of a file."""
     try:
-        with open(path, "r", encoding="utf-8", errors="replace") as data:
+        with open(path, "r", encoding="utf-8-sig", errors="replace") as data:      # utf-8-sig drops a byte order mark
             for _, line in zip(range(200), data):
                 text = line.strip()
                 if not text:

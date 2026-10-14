@@ -527,6 +527,29 @@ class TestErrors:
         assert code == 1 and "cannot read tree file" in err and "Traceback" not in err
         assert "no label sets were given" not in err
 
+    def test_a_byte_order_mark_is_ignored(self, run, tmp_path):
+        # the mark made the whole tree one tip, so no tip was selected and the tree could not be written
+        path = tmp_path / "bom.nwk"
+        path.write_bytes(b"\xef\xbb\xbf" + SPECIES.encode() + b"\n")
+        code, out, err = run(f"-i {path} -L Test ^[ABDE]$")
+        assert code == 0, err
+        assert out == "(O,((M1,(A{Test},(B{Test},C))),(M2,(D{Test},E{Test}){Test})));\n"
+        code, out, _ = run(f"-i {path} -L Test ^[ABDE]$ -F hyphy")
+        assert code == 0 and "{Test}" in out
+
+    @pytest.mark.parametrize("text, message", [
+        ("((A{Test},B){Test}95,C);\n", "unexpected text '95' at position 18 of the tree, after a label or comment"),
+        ("((Pop#12a,B),C);\n", "unexpected text 'a' at position 8 of the tree, after a label or comment"),
+        ("locus1 ((A,B),C);\n", "unexpected text 'locus1' at position 0 of the tree, before its first '('"),
+        ("begin trees;\ntree t1 = ((A,B),C);\nend;\n", "NEXUS format is not supported"),
+    ])
+    def test_text_in_the_wrong_place_is_a_clear_error(self, run, tmp_path, text, message):
+        path = tmp_path / "x.nwk"
+        path.write_text(text)
+        for options in ("", "-F hyphy", "-F table"):
+            code, out, err = run(f"-i {path} {options}")
+            assert code == 1 and out == "" and message in err and "Traceback" not in err
+
     def test_input_that_is_not_a_tree(self, run, tmp_path):
         path = tmp_path / "x.nwk"
         path.write_text("this is not a tree\n")
