@@ -388,6 +388,7 @@ def _rewrite(newick: str, label_syntax: str) -> _Rewrite:
     syntaxes: set[str] = set()
     out: list[str] = []
     in_node_part = 0     # annotations seen on the current node or edge
+    on_branch = 0        # labels seen on the current branch, before and after its length
     has_dists = False
 
     def slot(label: str) -> int:
@@ -405,6 +406,15 @@ def _rewrite(newick: str, label_syntax: str) -> _Rewrite:
                 "and twig can read only one per node or edge"
             )
 
+    def count_label(pos: int) -> None:
+        nonlocal on_branch
+        on_branch += 1
+        if on_branch > 1:
+            raise TwigError(
+                f"the branch near position {pos} of the tree has more than one label, "
+                "for example one before and one after its length, and twig can read only one"
+            )
+
     def refuse(syntax: str, token: str, pos: int) -> None:
         raise TwigError(
             f"found {token!r} at position {pos} of the tree, but the label syntax is {label_syntax!r} "
@@ -414,6 +424,8 @@ def _rewrite(newick: str, label_syntax: str) -> _Rewrite:
     for kind, token, pos in _tokens(newick):
         if kind == "punct":
             in_node_part = 0
+            if token != ":":
+                on_branch = 0
             has_dists = has_dists or token == ":"
             out.append(token)
         elif kind == "text":
@@ -429,6 +441,7 @@ def _rewrite(newick: str, label_syntax: str) -> _Rewrite:
             if not label:
                 raise TwigError(f"empty label {token!r} at position {pos} of the tree")
             annotate(pos)
+            count_label(pos)
             syntaxes.add("braces")
             out.append(f"[&{_TMP_LABEL}={slot(label)}]")
         elif kind == "mark":
@@ -437,6 +450,7 @@ def _rewrite(newick: str, label_syntax: str) -> _Rewrite:
             if "paml" not in modes:
                 refuse("PAML", token, pos)
             annotate(pos)
+            count_label(pos)
             syntaxes.add("paml")
             key = _TMP_PAML if token[0] == "#" else _TMP_CLADE
             out.append(f"[&{key}={token[1:]}]")
@@ -454,6 +468,7 @@ def _rewrite(newick: str, label_syntax: str) -> _Rewrite:
                     value = value.strip().strip('"')
                     if not value:
                         raise TwigError(f"empty label in {token!r} at position {pos} of the tree")
+                    count_label(pos)
                     syntaxes.add("nhx")
                     kept.append(f"{_TMP_LABEL}={slot(value)}")
                 else:

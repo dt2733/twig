@@ -342,6 +342,22 @@ class TestLabelSyntaxes:
         # one annotation on the node and one on its edge is fine
         assert treeio.read_tree("(A{Test}:0.1[&x=1],B);")[0].label == "Test"
 
+    @pytest.mark.parametrize("newick", [
+        "((A{Test}:0.1,B:0.1){Test}:0.2{Ref},C:0.1);",
+        "((A#1:0.1#2,B:0.1),C:0.1);",
+        "((A[&label=Test]:0.1[&label=Ref],B:0.1),C:0.1);",
+        "((A,B)$1:0.1#2,C);",
+        "(A[&label=Test,label=Ref],B);",
+    ])
+    def test_two_labels_on_one_branch_are_a_clear_error(self, newick):
+        # the label after the length won without a word
+        with pytest.raises(TwigError, match="has more than one label"):
+            treeio.read_tree(newick)
+
+    def test_a_label_and_another_annotation_on_one_branch_are_fine(self):
+        assert treeio.read_tree("(A[&x=1]:0.1{Test},B);")[0].label == "Test"
+        assert treeio.read_tree("((A,B)95{Test}:0.2[&x=1],C);").get_mrca_node(0, 1).label == "Test"
+
     @pytest.mark.parametrize("newick, text", [
         ("((A{Test},B){Test}95,C);", "95"),
         ("((A{Test}x,B),C);", "x"),
