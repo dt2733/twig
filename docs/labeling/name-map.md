@@ -50,7 +50,7 @@ Taxon Mapping:
 
 Reporting:
   --show str                       rows of the table to print (all, problems) [all]
-  --strict                         error if any name is unmapped, ambiguous or inferred, or leaves alphabetic leftover tokens
+  --strict                         error if any name is unmapped, ambiguous or inferred, or leaves alphabetic leftover tokens, or if a tree or FASTA file repeats a name
 
 Runtime:
   -f, --force                      overwrite existing output files
@@ -172,7 +172,7 @@ status ambiguous 1, inferred 1, ok 10, unmapped 1
 Amaranthus_pumilus has up to 2 samples in one tree or FASTA file, which happens in 2 of the 4 where it occurs
 ```
 
-Besides the counts and the names that need attention, the summary lists species of the species tree that have no samples, the words that are left over after the species name for each species, and the species that have more than one sample in a single tree or file. The last two help to find a delimiter that splits names too finely or too coarsely, and a subspecies that is lumped into its species.
+Besides the counts and the names that need attention, the summary names every tree or FASTA file in which a name occurs more than once, which means that the file is broken, and it lists species of the species tree that have no samples, the words that are left over after the species name for each species, and the species that have more than one sample in a single tree or file. The last two help to find a delimiter that splits names too finely or too coarsely, and a subspecies that is lumped into its species.
 
 ## Parsing names
 
@@ -254,7 +254,7 @@ An existing output file is never overwritten unless you pass `-f`. Even with `-f
 
 ## Strict mode
 
-With `--strict` the tool stops with an error and exit status 1 if any name is unmapped, ambiguous or inferred, or has words left over after the species name. The table is still written, so you can see what needs attention, but no map file is frozen. This is useful in a script that should stop before a long analysis starts.
+With `--strict` the tool stops with an error and exit status 1 if any name is unmapped, ambiguous or inferred, or has words left over after the species name, or if a tree or a FASTA file holds a name more than once. The table is still written, so you can see what needs attention, but no map file is frozen. This is useful in a script that should stop before a long analysis starts.
 
 ## Large data sets
 

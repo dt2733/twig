@@ -34,10 +34,19 @@ SHOWN = 8
 
 @dataclass
 class Unit:
-    """The names in one tree or one FASTA file."""
+    """The names in one tree or one FASTA file, with the number of the tree in its file."""
     path: Path
     kind: str
     names: list[str]
+    number: int | None = None
+
+    def where(self) -> str:
+        """Return the file, and the tree if the file is a tree file, for log messages."""
+        return f"tree {self.number} of {self.path}" if self.kind == "tree" else str(self.path)
+
+    def repeated(self) -> list[str]:
+        """Return the names that occur more than once, in order."""
+        return [name for name, k in Counter(self.names).items() if k > 1]
 
 
 def read_vocab_list(path: Path) -> list[str]:
@@ -73,7 +82,7 @@ def read_units(items: list[Path]) -> list[Unit]:
                         names = treeio.tip_names(newick)
                     except TwigError as exc:
                         raise TwigError(f"{path}, tree {number}: {exc}") from None
-                    units.append(Unit(path, "tree", names))
+                    units.append(Unit(path, "tree", names, number))
     if not units:
         raise TwigError("no names were found in the input files")
     return units
@@ -105,6 +114,12 @@ def needs_attention(hit: NameHit) -> bool:
 
 def summarize(hits: list[NameHit], units: list[Unit], vocabulary: list[str] | None) -> None:
     """Write a summary of the mapping to the log."""
+    for unit in units:
+        repeated = unit.repeated()
+        if repeated:
+            verb = "occurs" if len(repeated) == 1 else "occur"
+            logger.warning(f"{count(len(repeated), 'name')} {verb} more than once in {unit.where()}. {_shown(repeated)}")
+
     n_files = len({u.path for u in units})
     n_trees = sum(u.kind == "tree" for u in units)
     n_fasta = sum(u.kind == "fasta" for u in units)
@@ -146,7 +161,8 @@ def summarize(hits: list[NameHit], units: list[Unit], vocabulary: list[str] | No
     by_species: dict[str, list[int]] = defaultdict(list)
     species_of = {h.name: h.species for h in hits}
     for unit in units:
-        counts = Counter(species_of[n] for n in unit.names if species_of.get(n))
+        # a repeated name is one sample, and it is reported above
+        counts = Counter(species_of[n] for n in dict.fromkeys(unit.names) if species_of.get(n))
         for species, k in counts.items():
             by_species[species].append(k)
     several = {s: v for s, v in by_species.items() if max(v) > 1}
@@ -201,9 +217,14 @@ def run_name_map(args) -> None:
     summarize(hits, units, vocabulary)
 
     problems = [h for h in hits if needs_attention(h)]
-    if args.strict and problems:
-        verb = "needs" if len(problems) == 1 else "need"
-        raise TwigError(f"{count(len(problems), 'name')} {verb} attention, see the table and the messages above")
+    repeated = [u for u in units if u.repeated()]
+    if args.strict and (problems or repeated):
+        found = []
+        if problems:
+            found.append(f"{count(len(problems), 'name')} {'needs' if len(problems) == 1 else 'need'} attention")
+        if repeated:
+            found.append(f"{count(len(repeated), 'tree or FASTA file', 'trees or FASTA files')} {'has' if len(repeated) == 1 else 'have'} repeated names")
+        raise TwigError(" and ".join(found) + ", see the table and the messages above")
     if args.freeze:
         write_frozen_map(hits, args.freeze, force=args.force)
         logger.info(f"wrote the resolved map to {args.freeze}, use it with -I")

@@ -138,7 +138,7 @@ def get_parser_name_map(parser: ArgumentParser | None = None) -> ArgumentParser:
 
     report = parser.add_argument_group("Reporting")
     report.add_argument("--show", type=str, metavar="str", choices=SHOW_CHOICES, default="all", help="rows of the table to print (all, problems) [%(default)s]")
-    report.add_argument("--strict", action="store_true", help="error if any name is unmapped, ambiguous or inferred, or leaves alphabetic leftover tokens")
+    report.add_argument("--strict", action="store_true", help="error if any name is unmapped, ambiguous or inferred, or leaves alphabetic leftover tokens, or if a tree or FASTA file repeats a name")
 
     runtime = parser.add_argument_group("Runtime")
     runtime.add_argument("-f", "--force", action="store_true", help="overwrite existing output files")

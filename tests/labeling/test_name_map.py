@@ -305,6 +305,42 @@ class TestInputs:
         assert code == 1 and "tip names are not unique" in err
 
 
+class TestRepeatedNames:
+    @pytest.fixture
+    def files(self, tmp_path):
+        alignment = tmp_path / "dup.fa"
+        alignment.write_text(">Amaranthus_pumilus\nAAA\n>Amaranthus_pumilus\nAAA\n>Beta_vulgaris\nAAA\n")
+        trees = tmp_path / "dup.nwk"
+        trees.write_text("(Beta_vulgaris,Atriplex_pumilus);\n((Amaranthus_pumilus,Amaranthus_pumilus),(Beta_vulgaris,Atriplex_pumilus));\n")
+        species = tmp_path / "sp.nwk"
+        species.write_text("((Amaranthus_pumilus,Amaranthus_hybridus),(Atriplex_pumilus,Beta_vulgaris));\n")
+        return alignment, trees, species
+
+    def test_a_name_repeated_in_a_file_is_reported_and_fails_strict(self, run_twig, files):
+        alignment, trees, species = files
+        code, out, err = run_twig(f"name-map -i {alignment} {trees} -s {species} --strict")
+        assert code == 1
+        assert f"1 name occurs more than once in {alignment}. Amaranthus_pumilus" in err
+        assert f"1 name occurs more than once in tree 2 of {trees}. Amaranthus_pumilus" in err
+        assert "2 trees or FASTA files have repeated names, see the table" in err
+        assert "need attention" not in err
+        # a repeated name is not counted as a second sample of its species
+        assert "samples in one tree or FASTA file" not in err
+        assert len(parse_table(out)) == 3
+
+    def test_without_strict_the_run_goes_on(self, run_twig, files, tmp_path):
+        alignment, trees, species = files
+        frozen = tmp_path / "names.tsv"
+        code, _, err = run_twig(f"name-map -i {alignment} -s {species} --freeze {frozen}")
+        assert code == 0 and "1 name occurs more than once" in err and frozen.exists()
+
+    def test_names_and_repeats_are_counted_together_by_strict(self, run_twig, files):
+        alignment, _, species = files
+        alignment.write_text(alignment.read_text() + ">Zea_mays\nAAA\n")
+        code, _, err = run_twig(f"name-map -i {alignment} -s {species} --strict")
+        assert code == 1 and "1 name needs attention and 1 tree or FASTA file has repeated names" in err
+
+
 class TestSummaryLimits:
     def test_long_lists_are_cut(self, run_twig, tmp_path):
         species = [f"Genus{i}_species" for i in range(10)]
