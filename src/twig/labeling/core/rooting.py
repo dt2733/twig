@@ -8,9 +8,13 @@ the first internal root child, which depends on the order in which the children
 happen to be written. twig makes the choice itself with an explicit policy
 (`plan_root_merge`) and writes the tree as unrooted.
 
-Rerooting an already rooted tree has the same problem. toytree merges the two
-old root branches and keeps only the label of the root child on the far side
-from the new root, so the labels are merged by the policy first.
+Rerooting an already rooted tree has the same problem. toytree first unroots
+the tree. The first internal root child becomes the root, and the branch of the
+other child stands for both old root branches with that child's label. The
+labels are then moved along the path to the new root, so the label that
+survives depends on the order of the children and on where the new root is.
+twig merges the two labels by the policy first and gives the result to both
+old root children, so it survives whichever branch toytree keeps.
 
 Rooting is decided with sets of tips and not with toytree's monophyly test,
 which raises on unrooted trees.
@@ -177,8 +181,8 @@ def root_on(tree, target_idx: int, policy: str = "unlabel") -> tuple["object", l
 
     Labels stay on their branches. If the tree already had a root with two
     children, their branches become one, and the label of that branch is chosen
-    by the policy before the tree is rerooted (otherwise toytree would keep only
-    the label of one of them).
+    by the policy before the tree is rerooted. Otherwise toytree would keep the
+    label of one of them, chosen by the order of the children.
     """
     out = treeio.copy_tree(tree)
     target = out[target_idx]
@@ -197,7 +201,8 @@ def root_on(tree, target_idx: int, policy: str = "unlabel") -> tuple["object", l
                 f"the two branches at the old root had the labels {first} and {second}, "
                 f"and the merged branch has {label or 'no label'}"
             )
-        far.label = label
+        # toytree keeps the branch of one child and replaces the label of the other while rerooting
+        near.label = far.label = label
     with treeio.deep_recursion(out):
         rooted = out.root(target.idx, edge_features=["label"])
     treeio.ensure_labels(rooted)

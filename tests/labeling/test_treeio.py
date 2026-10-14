@@ -139,14 +139,16 @@ class TestReadTree:
         assert labels(copy) == labels(tree) and "label" in copy.edge_features
 
     def test_labels_follow_their_branches_when_the_tree_is_rerooted(self):
+        # the tree was rooted on E before, which is where it is rooted already, so nothing moved
+        from twig.labeling.core import rooting
         tree = treeio.read_tree("(((A{Test}:1,B:1):1,(C:1,D:1){Rev}:1):1,E:2);")
-        rooted = tree.root("E", edge_features=["label"])
-        by_name = {n.name: n.label for n in rooted if n.is_leaf()}
-        assert by_name["A"] == "Test"
-        assert {n.label for n in rooted if not n.is_leaf() and n.label} == {"Rev"}
-        # the Rev label must still sit on the branch above the (C,D) clade
-        node = rooted.get_mrca_node("C", "D")
-        assert node.label == "Rev"
+        a = next(n for n in tree if n.name == "A")
+        rooted, _ = rooting.root_on(tree, a.idx)
+        below = rooting.tip_name_sets(rooted)
+        assert sorted(",".join(sorted(below[c.idx])) for c in rooted.treenode.children) == ["A", "B,C,D,E"]
+        # A's branch is cut by the new root and keeps its label on both halves, and Rev stays above C and D
+        found = sorted((",".join(sorted(below[n.idx])), n.label) for n in rooted if n.label)
+        assert found == [("A", "Test"), ("B,C,D,E", "Test"), ("C,D", "Rev")]
 
     def test_label_text_is_kept_exactly_and_never_converted_to_numbers(self):
         tree = treeio.read_tree("(A{nan}:1,B{1e5}:1,C{Inf}:1);")

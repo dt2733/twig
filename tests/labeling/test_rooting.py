@@ -160,6 +160,37 @@ class TestRootOn:
         rooted, notes = rooting.root_on(tree, c.idx, "outgroup")
         assert splits(rooted)[("O",)] == [("Z", 2.0)]
 
+    # two internal children at the root, written in both orders, because toytree keeps the branch of one of them by order
+    TWO_SIDES = ("((A{Test}:1,B:1){T}:2,(C{Ref}:1,D:1){R}:3);", "((C{Ref}:1,D:1){R}:3,(A{Test}:1,B:1){T}:2);")
+
+    @pytest.mark.parametrize("newick", TWO_SIDES)
+    @pytest.mark.parametrize("target, near, far", [("A", "T", "R"), ("B", "T", "R"), ("C", "R", "T"), ("D", "R", "T")])
+    @pytest.mark.parametrize("policy", ["unlabel", "labeled", "outgroup", "ingroup", "T", "R"])
+    def test_the_merged_branch_follows_the_policy_whatever_the_order_of_the_root_children(self, newick, target, near, far, policy):
+        tree = treeio.read_tree(newick)
+        node = next(n for n in tree if n.name == target)
+        rooted, notes = rooting.root_on(tree, node.idx, policy)
+        expected = {"unlabel": None, "labeled": None, "outgroup": near, "ingroup": far}.get(policy, policy)
+        assert splits(rooted)[("A", "B")] == [(expected, 5.0)]
+        assert len(notes) == 1 and notes[0].endswith(f"the merged branch has {expected or 'no label'}")
+        before, after = labels_of(tree), labels_of(rooted)
+        assert all(after[key] == label for key, label in before.items()), (before, after)
+
+    @pytest.mark.parametrize("newick", [
+        "((A{Test}:1,B:1):2,(C{Ref}:1,D:1){Ref}:3);",
+        "((C{Ref}:1,D:1){Ref}:3,(A{Test}:1,B:1):2);",
+    ])
+    def test_a_label_that_the_policy_removes_does_not_come_back(self, newick):
+        # rooting on C kept Ref on the merged branch when the side of C came second, although the note said no label
+        tree = treeio.read_tree(newick)
+        c = next(n for n in tree if n.name == "C")
+        rooted, notes = rooting.root_on(tree, c.idx, "unlabel")
+        assert splits(rooted)[("A", "B")] == [(None, 5.0)]
+        assert notes == ["the two branches at the old root had the labels Ref and no label, and the merged branch has no label"]
+        rooted, _ = rooting.root_on(tree, c.idx, "labeled")
+        assert splits(rooted)[("A", "B")] == [("Ref", 5.0)]
+        assert labels_of(rooted)[("A",)] == "Test" and labels_of(rooted)[("C",)] == "Ref"
+
     def test_equal_labels_at_the_old_root_give_no_note(self):
         tree = treeio.read_tree(LABELED)
         c = next(n for n in tree if n.name == "C")

@@ -336,6 +336,19 @@ class TestRootEdgesAndRooting:
         _, _, err = run(f"-i {distinct} -r B,C")
         assert "the two branches at the old root had the labels" in err
 
+    def test_the_merged_old_root_branch_does_not_depend_on_the_order_of_the_children(self, run, tmp_path):
+        # with the side of C written second, Ref stayed on the merged branch although the warning said no label
+        for newick in ("((A{Test}:1,B:1):2,(C{Ref}:1,D:1){Ref}:3);", "((C{Ref}:1,D:1){Ref}:3,(A{Test}:1,B:1):2);"):
+            tree = tmp_path / "t.nwk"
+            tree.write_text(newick)
+            code, out, err = run(f"-i {tree} -r C")
+            assert code == 0 and out == "(C{Ref}:0.5,(D:1,(A{Test}:1,B:1):5){Ref}:0.5);\n"
+            assert "the merged branch has no label" in err
+            _, out, _ = run(f"-i {tree} -r C --root-edges labeled")
+            assert out == "(C{Ref}:0.5,(D:1,(A{Test}:1,B:1){Ref}:5){Ref}:0.5);\n"
+            _, out, _ = run(f"-i {tree} -r C -L Test ^A$ -F hyphy")
+            assert out == "(C{Ref}:1,D:1,(A{Test}:1,B:1):5);\n"
+
 
 class TestExistingLabels:
     def test_existing_labels_are_kept_by_default(self, run, tmp_path):
