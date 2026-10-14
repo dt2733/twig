@@ -206,9 +206,11 @@ def read_manifest(path: str | Path) -> list[ManifestRow]:
     """
     path = Path(path)
     try:
-        text = path.read_text(encoding="utf-8")
+        text = path.read_text(encoding="utf-8-sig")       # utf-8-sig drops a byte order mark
     except OSError as exc:
         raise TwigError(f"cannot read manifest {path}: {exc}") from exc
+    except UnicodeDecodeError as exc:
+        raise TwigError(f"manifest {path} is not valid UTF-8 text") from exc
 
     def locate(value: str, where: str) -> Path:
         candidate = Path(value)

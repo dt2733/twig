@@ -31,6 +31,13 @@ class TestSelector:
         assert selector.select(NAMES) == ["A", "B", "Beta_vulgaris"]
         assert not selector.matches("MA")        # list entries are exact names
 
+    def test_a_byte_order_mark_is_not_part_of_the_first_name(self, tmp_path):
+        path = tmp_path / "list.txt"
+        path.write_bytes("\ufeffA\nB\n".encode("utf-8"))
+        assert read_name_list(path) == (["A", "B"], [])
+        path.write_bytes("\ufeff~^Beta\n".encode("utf-8"))
+        assert read_name_list(path) == ([], ["^Beta"])
+
     def test_exact_flag_does_not_change_how_lists_are_read(self, tmp_path):
         path = tmp_path / "list.txt"
         path.write_text("~^Beta\n")

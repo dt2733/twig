@@ -181,6 +181,15 @@ class TestManifest:
         with pytest.raises(TwigError, match=message):
             batch.read_manifest(path)
 
+    def test_a_byte_order_mark_is_not_part_of_the_first_locus(self, tmp_path):
+        (tmp_path / "t.nwk").write_text("(A,B);")
+        path = tmp_path / "manifest.tsv"
+        path.write_bytes(f"\ufeffOG1 {tmp_path / 't.nwk'}\n".encode("utf-8"))
+        assert [r.locus for r in batch.read_manifest(path)] == ["OG1"]
+        path.write_bytes(b"OG\xe9 t.nwk\n")
+        with pytest.raises(TwigError, match="not valid UTF-8"):
+            batch.read_manifest(path)
+
     def test_duplicate_locus(self, tmp_path):
         (tmp_path / "t.nwk").write_text("(A,B);")
         path = tmp_path / "manifest.tsv"

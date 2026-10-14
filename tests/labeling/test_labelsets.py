@@ -515,6 +515,14 @@ class TestReadingSets:
         assert sets[1] == LabelSet("Out", "tips", ("^O$", "^Z$"))
         assert sets[2] == LabelSet("Rest", "all", ("M1", "M2"))
 
+    def test_spec_file_with_a_byte_order_mark(self, tmp_path):
+        path = tmp_path / "labels.tsv"
+        path.write_bytes("\ufeffTest\ttips\tA\n".encode("utf-8"))
+        assert read_spec(path) == [LabelSet("Test", "tips", ("A",))]
+        path.write_bytes(b"Test\ttips\t\xe9\n")
+        with pytest.raises(TwigError, match="not valid UTF-8"):
+            read_spec(path)
+
     @pytest.mark.parametrize("text, message", [
         ("Test\tfitch\n", r"labels.tsv:1: expected 3 or 4"),
         ("Test\tmagic\tA\n", r"labels.tsv:1: unknown rule"),

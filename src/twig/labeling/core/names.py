@@ -176,7 +176,7 @@ def parse_map_file(path: str | Path) -> list[MapRow]:
     """
     path = Path(path)
     try:
-        text = path.read_text(encoding="utf-8")
+        text = path.read_text(encoding="utf-8-sig")       # utf-8-sig drops a byte order mark
     except OSError as exc:
         raise TwigError(f"cannot read map file {path}: {exc}") from exc
     except UnicodeDecodeError as exc:

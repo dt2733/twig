@@ -42,9 +42,11 @@ class Unit:
 def read_vocab_list(path: Path) -> list[str]:
     """Return the species names listed in a file, one per line."""
     try:
-        text = path.read_text(encoding="utf-8")
+        text = path.read_text(encoding="utf-8-sig")       # utf-8-sig drops a byte order mark
     except OSError as exc:
         raise TwigError(f"cannot read species list {path}: {exc}") from exc
+    except UnicodeDecodeError as exc:
+        raise TwigError(f"species list {path} is not valid UTF-8 text") from exc
     names = [line.split()[0] for line in text.splitlines() if line.strip() and not line.strip().startswith("#")]
     if not names:
         raise TwigError(f"{path}: no species names found")

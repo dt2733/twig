@@ -155,9 +155,11 @@ def read_spec(path: str | Path, default_rule: str = "all") -> list[LabelSet]:
     """
     path = Path(path)
     try:
-        text = path.read_text(encoding="utf-8")
+        text = path.read_text(encoding="utf-8-sig")       # utf-8-sig drops a byte order mark
     except OSError as exc:
         raise TwigError(f"cannot read label spec {path}: {exc}") from exc
+    except UnicodeDecodeError as exc:
+        raise TwigError(f"label spec {path} is not valid UTF-8 text") from exc
     sets = []
     for lineno, raw in enumerate(text.splitlines(), start=1):
         if not raw.strip() or raw.lstrip().startswith("#"):

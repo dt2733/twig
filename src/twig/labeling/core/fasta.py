@@ -49,7 +49,7 @@ STOP_CODONS: dict[int, frozenset[str]] = {
 def _read_text(path: str | Path) -> str:
     path = Path(path)
     try:
-        return path.read_text(encoding="utf-8")
+        return path.read_text(encoding="utf-8-sig")       # utf-8-sig drops a byte order mark
     except OSError as exc:
         raise TwigError(f"cannot read {path}: {exc}") from exc
     except UnicodeDecodeError as exc:
@@ -104,7 +104,7 @@ def read_headers(path: str | Path) -> list[str]:
     path = Path(path)
     names = []
     try:
-        with open(path, "r", encoding="utf-8") as data:
+        with open(path, "r", encoding="utf-8-sig") as data:
             for lineno, line in enumerate(data, start=1):
                 if line.startswith(">"):
                     fields = line[1:].split()

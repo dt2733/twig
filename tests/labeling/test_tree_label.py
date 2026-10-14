@@ -528,6 +528,15 @@ class TestSeveralLabels:
         assert code == 0, err
         assert out == "((A_1{Test},A_2{Test}){Test},(B_1{Test},C_1),D_1);\n"
 
+    def test_a_map_file_with_a_byte_order_mark_maps_its_first_row(self, run, tmp_path):
+        tree = tmp_path / "gene.nwk"
+        tree.write_text("((s1,s3),(s2,s4));")
+        mapping = tmp_path / "map.txt"
+        mapping.write_bytes("\ufeffs1 Amaranthus_pumilus\ns3 Amaranthus_pumilus\ns2 Beta_vulgaris\ns4 Beta_vulgaris\n".encode("utf-8"))
+        code, out, err = run(f"-i {tree} -L Test Amaranthus_pumilus --select-on species -I {mapping} --rule all --background Reference --exact")
+        assert code == 0, err
+        assert out == "((s1{Test},s3{Test}){Test},(s2{Reference},s4{Reference}){Reference});\n"
+
     def test_species_selection_without_a_map_gives_a_warning(self, run):
         _, _, err = run(f"-i {NAMED} -L Test A --select-on species --rule tips")
         assert "every tip is its own species" in err

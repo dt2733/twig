@@ -148,6 +148,23 @@ class TestMappingOptions:
         assert rows["Beta_vulgaris"] == "ok" and rows["Amaranthus_pumilus"] == "unmapped"
         assert "the species vocabulary has 2 species" in err
 
+    def test_a_byte_order_mark_is_not_part_of_the_first_species(self, run_twig, names_dir, tmp_path):
+        listing = tmp_path / "species.txt"
+        listing.write_bytes("\ufeffBeta_vulgaris\nSpinacia_oleracea\n".encode("utf-8"))
+        alignment = tmp_path / "OG1.fa"
+        alignment.write_bytes("\ufeff>Beta_vulgaris\nACGT\n>Spinacia_oleracea\nACGT\n".encode("utf-8"))
+        code, out, err = run_twig(f"name-map -i {alignment} -V {listing} --strict")
+        assert code == 0, err
+        rows = {r["name"]: (r["species"], r["method"]) for r in parse_table(out)}
+        assert rows == {"Beta_vulgaris": ("Beta_vulgaris", "exact"), "Spinacia_oleracea": ("Spinacia_oleracea", "exact")}
+        assert "\ufeff" not in out + err
+
+    def test_a_species_list_that_is_not_text_is_a_clear_error(self, run_twig, names_dir, tmp_path):
+        listing = tmp_path / "species.txt"
+        listing.write_bytes(b"Amaranthus_pumilus \xe9\n")
+        code, _, err = run_twig(f"name-map -i {names_dir}/trees/OG0001.treefile -V {listing}")
+        assert code == 1 and "species.txt is not valid UTF-8 text" in err and "Traceback" not in err
+
     def test_species_tree_and_list_are_combined(self, run_twig, names_dir, tmp_path):
         listing = tmp_path / "species.txt"
         listing.write_text("Zea_mays\n")

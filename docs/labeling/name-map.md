@@ -63,7 +63,7 @@ The input to `-i` is any mix of tree files, FASTA files, directories and globs. 
 
 A tree file can hold one tree or many trees, which can span several lines. Blank lines, comment lines that start with `#` and a PAML header with the number of species and trees are skipped. Trees can carry labels, support values, branch lengths and annotations, all of which are ignored here. NEXUS files and quoted names are not supported.
 
-The species come from the tips of the species tree given to `-s`, from a text file with one species per line given to `-V`, or from both. Labels on the species tree are ignored. Without either option the tool still lists the names, but it cannot match them to species.
+The species come from the tips of the species tree given to `-s`, from a text file with one species per line given to `-V`, or from both. Labels on the species tree are ignored. Without either option the tool still lists the names, but it cannot match them to species. A byte order mark at the start of a file, which some Windows editors add, is ignored in every file that the tool reads, including map files.
 
 ## How names are matched
 

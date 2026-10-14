@@ -114,6 +114,15 @@ class TestMapFile:
         with pytest.raises(TwigError, match="not valid UTF-8"):
             parse_map_file(path)
 
+    def test_a_byte_order_mark_is_not_part_of_the_first_sample(self, tmp_path):
+        # Windows editors add the mark, which used to make the first row match no name
+        path = tmp_path / "map.tsv"
+        path.write_bytes("\ufeffAmaranthus_pumilus_s9 Atriplex_pumilus\nx1 Beta_vulgaris\n".encode("utf-8"))
+        rows = parse_map_file(path)
+        assert rows[0].sample == "Amaranthus_pumilus_s9"
+        hit = NameMapper(map_rows=rows, vocabulary=SPECIES).resolve("Amaranthus_pumilus_s9")
+        assert (hit.species, hit.method) == ("Atriplex_pumilus", "map")
+
 
 ###########################################################################
 # vocabulary matching

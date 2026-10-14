@@ -31,7 +31,7 @@ def read_name_list(path: str | Path) -> tuple[list[str], list[str]]:
     """Return the exact names and the regex patterns listed in a file."""
     path = Path(path)
     try:
-        text = path.read_text(encoding="utf-8")
+        text = path.read_text(encoding="utf-8-sig")       # utf-8-sig drops a byte order mark
     except OSError as exc:
         raise TwigError(f"cannot read selector list {path}: {exc}") from exc
     except UnicodeDecodeError as exc:

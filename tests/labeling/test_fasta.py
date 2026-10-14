@@ -38,6 +38,12 @@ class TestParse:
         with pytest.raises(TwigError, match="duplicate FASTA header"):
             fasta.read_fasta(path)
 
+    def test_a_byte_order_mark_is_ignored(self, tmp_path):
+        path = tmp_path / "x.fa"
+        path.write_bytes("\ufeff>a\nACGT\n>b\nAC--\n".encode("utf-8"))
+        assert fasta.read_headers(path) == ["a", "b"]
+        assert fasta.read_fasta(path) == {"a": "ACGT", "b": "AC--"}
+
     def test_header_scan_errors(self, tmp_path):
         empty = tmp_path / "empty.fa"
         empty.write_text("ACGT\n")
