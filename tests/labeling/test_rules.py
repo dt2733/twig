@@ -87,7 +87,8 @@ class TestDesignTable:
 
     def test_fitch_with_an_unknown_tip_has_a_single_origin_and_no_loss(self, tree):
         out = run(tree, "fitch", unknown="C")
-        assert where(tree, out) == ["A", "ABC", "B", "BC", "C", "D", "DE", "E"] or where(tree, out) == ["A", "ABC", "B", "BC", "D", "DE", "E"]
+        # C takes the state of the history inferred from the other tips, so it is labeled
+        assert where(tree, out) == ["A", "ABC", "B", "BC", "C", "D", "DE", "E"]
         assert out.losses == frozenset() and out.ambiguous == frozenset() and out.cost == 2
 
     def test_ambiguous_nodes_can_be_left_unlabeled_or_get_their_own_label(self, tree):
@@ -133,7 +134,6 @@ class TestCladeAndStem:
 
     def test_stem_labels_only_the_branch_above(self, tree):
         out = run(tree, "stem", select="BC", groups=["BC"])
-        assert where(tree, out) == ["C"] or where(tree, out) == ["BC"]
         # the common ancestor of B and C is BC
         assert where(tree, out) == ["BC"]
         out = run(tree, "stem", select="ABDE", groups=["AB", "DE"])
