@@ -48,7 +48,8 @@ class TestSelector:
         path.write_text("A\nZZZ\n~^Q\n")
         selector = Selector([path])
         assert selector.unused(NAMES) == ["ZZZ", "~^Q"]
-        assert Selector(["^Z"]).unused(NAMES) == ["~^Z"]
+        # a pattern from the command line is shown as it was typed, without a ~
+        assert Selector(["^Z"]).unused(NAMES) == ["^Z"]
 
     def test_empty_selector_matches_nothing(self):
         selector = Selector([])
@@ -67,4 +68,4 @@ class TestSelector:
         assert Selector([str(tmp_path / "missing.txt")]).select(NAMES) == []
 
     def test_describe(self):
-        assert "1 patterns" in Selector(["^A"]).describe()
+        assert Selector(["^A"]).describe() == "0 names and 1 pattern from ^A"

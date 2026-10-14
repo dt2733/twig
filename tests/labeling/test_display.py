@@ -22,6 +22,24 @@ def designed():
     return listing(SPECIES, sets, config)
 
 
+class TestCount:
+    @pytest.mark.parametrize("n, noun, expected", [
+        (1, "tip", "1 tip"),
+        (2, "tip", "2 tips"),
+        (0, "file", "0 files"),
+        (2, "branch", "2 branches"),
+        (1, "species", "1 species"),
+        (2, "species", "2 species"),
+        (3, "FASTA file", "3 FASTA files"),
+    ])
+    def test_nouns(self, n, noun, expected):
+        assert display.count(n, noun) == expected
+
+    def test_a_plural_can_be_given(self):
+        assert display.count(2, "listed name or pattern", "listed names or patterns") == "2 listed names or patterns"
+        assert display.count(1, "listed name or pattern", "listed names or patterns") == "1 listed name or pattern"
+
+
 class TestBranchListing:
     def test_labeled_branches_come_first_clade_by_clade(self):
         lines = designed()
@@ -92,6 +110,8 @@ class TestBranchListing:
         names = ",".join(f"t{i}" for i in range(50))
         lines = listing(f"({names});")
         assert lines[-2] == "  and 20 more unlabeled branches"
+        lines = listing("(" + ",".join(f"t{i}" for i in range(31)) + ");")
+        assert lines[-2] == "  and 1 more unlabeled branch"
 
     def test_roles_of_labeled_branches_read_from_a_tree_with_labels(self):
         tree = treeio.read_tree(LABELED)

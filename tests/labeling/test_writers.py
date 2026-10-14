@@ -188,7 +188,7 @@ class TestHyphy:
     def test_short_labeled_internal_branches_are_reported(self):
         found = warnings(check("hyphy", "((A:1,B:1){T}:0.0000001,(C:1,D:1){T}:0.5,E:1);"))
         assert [i.code for i in found] == ["short-labeled"]
-        assert "1 labeled internal branches" in found[0].message and "Constrain" in found[0].message
+        assert "1 labeled internal branch has a length of at most" in found[0].message and "Constrain" in found[0].message
 
     def test_short_tips_and_unlabeled_branches_are_not_reported(self):
         assert check("hyphy", "((A:0.0000001{T},B:1):0.0000001,(C:1,D:1){T}:0.5,E:1);") == []
@@ -202,6 +202,7 @@ class TestHyphy:
         tree[0]._dist = float("nan")
         found = errors(get_writer("hyphy").check(tree, WriteContext()))
         assert [i.code for i in found] == ["branch-length"]
+        assert found[0].message == "1 branch length is not a number"
 
     def test_issues_name_the_locus(self):
         found = get_writer("hyphy").check(treeio.read_tree(DISTINCT), WriteContext(locus="OG0001"))

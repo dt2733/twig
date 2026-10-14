@@ -25,7 +25,7 @@ from typing import ClassVar
 from twig.utils import TwigError
 from twig.labeling.core import rooting, treeio
 from twig.labeling.core.constants import INTERNAL_NAME_CHOICES
-from twig.labeling.core.display import names_below
+from twig.labeling.core.display import count, names_below
 from twig.labeling.core.model import RootMerge
 from twig.labeling.core.newick import braces_label, to_newick
 from twig.labeling.core.sanitize import NameTable, label_name_problem, sanitize_name
@@ -292,7 +292,7 @@ class TreeWriter(Writer):
         if write_dists(tree, ctx):
             nan = [node.idx for node, _, dist in written_branches(tree, merge) if dist is not None and dist != dist]
             if nan:
-                issues.append(Issue(ERROR, "branch-length", f"{len(nan)} branch lengths are not numbers", locus))
+                issues.append(Issue(ERROR, "branch-length", f"{count(len(nan), 'branch length')} {'is' if len(nan) == 1 else 'are'} not a number", locus))
             elif self.sanitizer == "hyphy":
                 short = [
                     node for node, label, dist in written_branches(tree, merge)
@@ -301,7 +301,8 @@ class TreeWriter(Writer):
                 if short:
                     issues.append(Issue(
                         WARNING, "short-labeled",
-                        f"{len(short)} labeled internal branches have lengths of at most {ctx.short_len:g}, "
+                        f"{count(len(short), 'labeled internal branch', 'labeled internal branches')} "
+                        f"{'has a length' if len(short) == 1 else 'have lengths'} of at most {ctx.short_len:g}, "
                         "which HyPhy may remove with --kill-zero-lengths Yes, so pass Constrain",
                         locus,
                     ))

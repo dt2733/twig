@@ -33,7 +33,7 @@ from pathlib import Path
 
 from twig.utils import TwigError
 from twig.labeling.core.constants import DEFAULT_NUISANCE_LABEL, PRECEDENCE_CHOICES
-from twig.labeling.core.display import clade_text
+from twig.labeling.core.display import clade_text, count
 from twig.labeling.core.parsimony import to_fraction
 from twig.labeling.core.rules import AMBIGUOUS_MODES, RULES, RuleInput, make_options, resolve_rule
 from twig.labeling.core.sanitize import check_label_names
@@ -204,6 +204,11 @@ def nuisance_set(values: Sequence[str], label: str = DEFAULT_NUISANCE_LABEL) -> 
 ###########################################################################
 # selecting tips
 ###########################################################################
+
+def _entries(n: int) -> str:
+    """Return the number of selector entries with its noun, such as '1 listed name or pattern'."""
+    return count(n, "listed name or pattern", "listed names or patterns")
+
 
 def select_tips(
     tree,
@@ -418,7 +423,8 @@ def apply_label_sets(
             pieces = [chosen]
         report.selected, report.unused = len(chosen), unused
         if unused:
-            warnings.append(f"label {item.name}: {len(unused)} listed names or patterns match no tip ({', '.join(unused[:5])}{' ...' if len(unused) > 5 else ''})")
+            verb = "matches" if len(unused) == 1 else "match"
+            warnings.append(f"label {item.name}: {_entries(len(unused))} {verb} no tip ({', '.join(unused[:5])}{' ...' if len(unused) > 5 else ''})")
         if not chosen:
             warnings.append(f"label {item.name}: the selectors choose no tips")
         selections.append(chosen)
@@ -427,7 +433,8 @@ def apply_label_sets(
 
     unknown, unused = select_tips(tree, config.unknown, config.exact, config.select_on, species_of) if config.unknown else (frozenset(), [])
     if unused:
-        warnings.append(f"--unknown has {len(unused)} listed names or patterns that match no tip ({', '.join(unused[:5])}{' ...' if len(unused) > 5 else ''})")
+        verb = "matches" if len(unused) == 1 else "match"
+        warnings.append(f"--unknown has {_entries(len(unused))} that {verb} no tip ({', '.join(unused[:5])}{' ...' if len(unused) > 5 else ''})")
     unknown = frozenset(unknown) | frozenset(i for item, sel in zip(sets, selections) if item.nuisance for i in sel)
 
     # every claim on a branch, with a rank where lower ranks win

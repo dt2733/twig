@@ -463,7 +463,7 @@ class TestWarningsAndErrors:
 
     def test_unknown_tips_that_match_nothing_are_reported(self):
         result = apply_label_sets(fresh(), [exact(*DIOECIOUS)], cfg(unknown=("Cx",)))
-        assert any("--unknown has 1 listed names or patterns that match no tip (Cx)" in w for w in result.warnings)
+        assert any("--unknown has 1 listed name or pattern that matches no tip (Cx)" in w for w in result.warnings)
 
     def test_costs_cannot_both_be_zero(self):
         # every history would cost nothing, and acctran used to give an arbitrary alternating labeling

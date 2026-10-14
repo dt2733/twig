@@ -21,6 +21,24 @@ CLADE_SHOWN = 8
 UNLABELED_SHOWN = 30
 
 
+def count(n: int, noun: str, plural: str | None = None) -> str:
+    """Return a number with its noun, such as '1 tip', '2 branches' or '2 species'.
+
+    Unless a plural is given, it is the noun with s added, or es after ch, sh,
+    s and x, and species stays the same.
+    """
+    if n == 1:
+        return f"{n} {noun}"
+    if plural is None:
+        if noun.endswith("species"):
+            plural = noun
+        elif noun.endswith(("ch", "sh", "s", "x")):
+            plural = noun + "es"
+        else:
+            plural = noun + "s"
+    return f"{n} {plural}"
+
+
 def names_below(tree, name_of: Callable[[str], str], limit: int) -> dict[int, list[str]]:
     """Return the names of the tips below every node, each once, in tree order.
 
@@ -110,7 +128,7 @@ def branch_listing(
     rows = [("-", role_of(n, kinds, sources), clades[n.idx]) for n in unlabeled[:UNLABELED_SHOWN]]
     lines += _table(rows) if rows else ["  none"]
     if len(unlabeled) > UNLABELED_SHOWN:
-        lines.append(f"  and {len(unlabeled) - UNLABELED_SHOWN} more unlabeled branches")
+        lines.append(f"  and {count(len(unlabeled) - UNLABELED_SHOWN, 'more unlabeled branch', 'more unlabeled branches')}")
     if merge is not None:
         kept, dissolved = clades[merge.kept], clades[merge.dissolved]
         lines.append(f"root     the branches {kept} and {dissolved} at the root are written as one branch, listed as {kept}")

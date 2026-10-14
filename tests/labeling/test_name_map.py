@@ -57,7 +57,7 @@ class TestTable:
         assert "1 name is ambiguous, matching more than one species" in err
         assert "1 name is unmapped, matching no species" in err
         assert "1 name is inferred, matched only by genus abbreviation" in err
-        assert "words left after the species name in Beta_vulgaris maritima" in err
+        assert "1 word is left after the species name in the names of Beta_vulgaris. maritima" in err
         assert "Amaranthus_pumilus has up to 2 samples in one tree or FASTA file" in err
         assert "the species vocabulary has 5 species" in err
         assert "\tstatus\t" not in err      # the table itself is only written to stdout
@@ -69,6 +69,20 @@ class TestTable:
         assert "1 species has no samples. Amaranthus_pumilus" in err
         _, _, err = run_twig(f"name-map -i {names_dir}/trees/OG0001.treefile {sp}")
         assert "no samples" not in err
+
+    def test_counts_in_the_summary_have_the_right_number(self, run_twig, names_dir, tmp_path):
+        sp = tmp_path / "sp.nwk"
+        sp.write_text("(Zea_mays,(Oryza_sativa,(Amaranthus_pumilus,Beta_vulgaris)));\n")
+        tree = tmp_path / "OG1.nwk"
+        tree.write_text("(Amaranthus_pumilus,Beta_vulgaris_maritima_s1,Beta_vulgaris_x_s2);\n")
+        code, _, err = run_twig(f"name-map -i {tree} -s {sp} --strict")
+        assert "2 species have no samples. Zea_mays, Oryza_sativa" in err and "speciess" not in err
+        assert "resolved 3 unique names from 1 file (1 tree, 0 FASTA files)" in err
+        assert "2 words are left after the species name in the names of Beta_vulgaris. maritima, x" in err
+        assert code == 1 and "2 names need attention" in err
+        tree.write_text("(Amaranthus_pumilus,Beta_vulgaris_maritima_s1);\n")
+        code, _, err = run_twig(f"name-map -i {tree} -s {sp} --strict")
+        assert code == 1 and "1 name needs attention" in err
 
 
 class TestOutputs:
@@ -229,7 +243,7 @@ class TestInputs:
         trees.write_text("(Beta_vulgaris,Spinacia_oleracea);\n(Beta_vulgaris,Atriplex_pumilus);\n")
         code, out, err = run_twig(f"name-map -i {trees} -s {names_dir}/species.nwk")
         rows = {r["name"]: r["n_files"] for r in parse_table(out)}
-        assert rows["Beta_vulgaris"] == "1" and "from 1 files (2 trees, 0 FASTA files)" in err
+        assert rows["Beta_vulgaris"] == "1" and "from 1 file (2 trees, 0 FASTA files)" in err
 
     def test_unknown_files_are_skipped_in_directories_but_not_when_named(self, run_twig, names_dir, tmp_path):
         folder = tmp_path / "mixed"

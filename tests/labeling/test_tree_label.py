@@ -519,7 +519,10 @@ class TestSeveralLabels:
     def test_selectors_that_match_nothing_are_reported(self, run):
         code, out, err = run(f"-i {NAMED} -L Test ^Q --rule tips")
         assert code == 0 and "the selectors choose no tips" in err and "no branch is labeled" in err
+        assert "label Test: 1 listed name or pattern matches no tip (^Q)" in err
         assert labeled_names(out) == {}
+        _, _, err = run(f"-i {NAMED} -L Test ^Q ^R ^A --rule tips")
+        assert "label Test: 2 listed names or patterns match no tip (^Q, ^R)" in err
 
     def test_species_selections_work_on_trees_with_several_samples(self, run, tmp_path):
         tree = tmp_path / "gene.nwk"
@@ -545,7 +548,7 @@ class TestSeveralLabels:
         code, _, err = run(f"-i {NAMED} -L Test:all {DIOECIOUS} --losses Rev --ambiguous Amb --gain-cost 5")
         assert code == 0 and "no label uses the fitch rule, so --losses, --ambiguous and --gain-cost have no effect" in err
         _, _, err = run(f"-i {NAMED} -L Test:fitch {DIOECIOUS} --unknown Cx")
-        assert "--unknown has 1 listed names or patterns that match no tip" in err and "no effect" not in err
+        assert "--unknown has 1 listed name or pattern that matches no tip" in err and "no effect" not in err
 
     def test_an_unknown_tip_takes_the_state_of_the_history_inferred_from_the_other_tips(self, run):
         _, out, _ = run(f"-i {NAMED} -L Test {DIOECIOUS} --rule fitch --unknown C --internal-names keep")

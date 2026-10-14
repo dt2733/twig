@@ -168,7 +168,7 @@ status ambiguous 1, inferred 1, ok 10, unmapped 1
 1 name is ambiguous, matching more than one species. A_pumilus_sample1 (Atriplex_pumilus, Amaranthus_pumilus)
 1 name is unmapped, matching no species. Zea_mays_s1 (Beta_vulgaris, Amaranthus_pumilus, Amaranthus_hybridus)
 1 name is inferred, matched only by genus abbreviation (review and freeze with --freeze). A_hybridus_s1 (Amaranthus_hybridus)
-words left after the species name in Beta_vulgaris maritima
+1 word is left after the species name in the names of Beta_vulgaris. maritima
 Amaranthus_pumilus has up to 2 samples in one tree or FASTA file, which happens in 2 of the 4 where it occurs
 ```
 

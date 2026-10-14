@@ -25,6 +25,7 @@ from loguru import logger
 
 from twig.utils import TwigError, set_log_level
 from twig.labeling.core import batch, fasta, treeio
+from twig.labeling.core.display import count
 from twig.labeling.core.names import NameHit, NameMapper, write_frozen_map, write_hit_table
 
 # how many items of a long list are shown in a log message
@@ -84,11 +85,6 @@ def _shown(items: list[str], limit: int = SHOWN) -> str:
     return text + f" and {len(items) - limit} more" if len(items) > limit else text
 
 
-def _count(n: int, noun: str) -> str:
-    """Return a count with its noun, such as '1 name' or '2 names'."""
-    return f"{n} {noun}" if n == 1 else f"{n} {noun}s"
-
-
 def needs_attention(hit: NameHit) -> bool:
     """Return True if a name is unresolved, inferred, or has leftover words."""
     return hit.status != "ok" or any(i.isalpha() for i in hit.leftover)
@@ -99,7 +95,10 @@ def summarize(hits: list[NameHit], units: list[Unit], vocabulary: list[str] | No
     n_files = len({u.path for u in units})
     n_trees = sum(u.kind == "tree" for u in units)
     n_fasta = sum(u.kind == "fasta" for u in units)
-    logger.info(f"resolved {len(hits)} unique names from {n_files} files ({n_trees} trees, {n_fasta} FASTA files)")
+    logger.info(
+        f"resolved {count(len(hits), 'unique name')} from {count(n_files, 'file')} "
+        f"({count(n_trees, 'tree')}, {count(n_fasta, 'FASTA file')})"
+    )
     logger.info("matched by " + ", ".join(f"{k} {v}" for k, v in sorted(Counter(h.method for h in hits).items())))
     logger.info("status " + ", ".join(f"{k} {v}" for k, v in sorted(Counter(h.status for h in hits).items())))
 
@@ -112,14 +111,14 @@ def summarize(hits: list[NameHit], units: list[Unit], vocabulary: list[str] | No
         if rows:
             detail = [f"{h.name} ({', '.join(c[0] for c in h.candidates[:3]) or h.species})" for h in rows]
             verb = "is" if len(rows) == 1 else "are"
-            logger.warning(f"{_count(len(rows), 'name')} {verb} {text}. {_shown(detail)}")
+            logger.warning(f"{count(len(rows), 'name')} {verb} {text}. {_shown(detail)}")
 
     if vocabulary:
         used = {h.species for h in hits if h.species}
         missing = [s for s in vocabulary if s not in used]
         if missing:
             verb = "has" if len(missing) == 1 else "have"
-            logger.info(f"{_count(len(missing), 'species')} {verb} no samples. {_shown(missing)}")
+            logger.info(f"{count(len(missing), 'species')} {verb} no samples. {_shown(missing)}")
 
     leftovers: dict[str, Counter] = defaultdict(Counter)
     for hit in hits:
@@ -128,7 +127,8 @@ def summarize(hits: list[NameHit], units: list[Unit], vocabulary: list[str] | No
                 if token.isalpha():
                     leftovers[hit.species][token] += 1
     for species, counter in sorted(leftovers.items()):
-        logger.warning(f"words left after the species name in {species} {_shown(sorted(counter))}")
+        verb = "is" if len(counter) == 1 else "are"
+        logger.warning(f"{count(len(counter), 'word')} {verb} left after the species name in the names of {species}. {_shown(sorted(counter))}")
 
     by_species: dict[str, list[int]] = defaultdict(list)
     species_of = {h.name: h.species for h in hits}
@@ -185,7 +185,7 @@ def run_name_map(args) -> None:
     write_hit_table(rows, table, counts=n_files)
     if args.out:
         batch.atomic_write(args.out, table.getvalue(), force=args.force)
-        logger.info(f"wrote the table of {len(rows)} names to {args.out}")
+        logger.info(f"wrote the table of {count(len(rows), 'name')} to {args.out}")
     else:
         batch.write_stdout(table.getvalue())
 
@@ -193,7 +193,8 @@ def run_name_map(args) -> None:
 
     problems = [h for h in hits if needs_attention(h)]
     if args.strict and problems:
-        raise TwigError(f"{len(problems)} names need attention, see the table and the messages above")
+        verb = "needs" if len(problems) == 1 else "need"
+        raise TwigError(f"{count(len(problems), 'name')} {verb} attention, see the table and the messages above")
     if args.freeze:
         write_frozen_map(hits, args.freeze, force=args.force)
         logger.info(f"wrote the resolved map to {args.freeze}, use it with -I")

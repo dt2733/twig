@@ -18,6 +18,7 @@ from collections.abc import Iterable, Sequence
 from pathlib import Path
 
 from twig.utils import TwigError
+from twig.labeling.core.display import count
 
 
 def _compile(pattern: str, where: str) -> re.Pattern:
@@ -69,6 +70,7 @@ class Selector:
         self.exact = exact
         self.names: dict[str, str] = {}
         self.patterns: dict[str, re.Pattern] = {}
+        self.pattern_sources: dict[str, str] = {}
         for value in self.values:
             if Path(value).is_file():
                 listed, patterns = read_name_list(value)
@@ -76,10 +78,12 @@ class Selector:
                     self.names.setdefault(name, value)
                 for pattern in patterns:
                     self.patterns.setdefault(pattern, _compile(pattern, value))
+                    self.pattern_sources.setdefault(pattern, value)
             elif exact:
                 self.names.setdefault(value, "command line")
             else:
                 self.patterns.setdefault(value, _compile(value, "command line"))
+                self.pattern_sources.setdefault(value, "command line")
 
     def __bool__(self) -> bool:
         return bool(self.names or self.patterns)
@@ -97,16 +101,18 @@ class Selector:
     def unused(self, names: Iterable[str]) -> list[str]:
         """Return listed names and patterns that select none of the names.
 
-        This is useful for warning about typos in a list file.
+        This is useful for warning about typos in a list file. A pattern is
+        given as it was written, with its ~ if it came from a list file.
         """
         names = list(names)
         present = set(names)
         missing = [i for i in self.names if i not in present]
         for pattern, compiled in self.patterns.items():
             if not any(compiled.search(name) for name in names):
-                missing.append("~" + pattern)
+                listed = self.pattern_sources[pattern] != "command line"
+                missing.append("~" + pattern if listed else pattern)
         return missing
 
     def describe(self) -> str:
         """Return a short description for log messages."""
-        return f"{len(self.names)} names and {len(self.patterns)} patterns from {', '.join(self.values) or 'nothing'}"
+        return f"{count(len(self.names), 'name')} and {count(len(self.patterns), 'pattern')} from {', '.join(self.values) or 'nothing'}"

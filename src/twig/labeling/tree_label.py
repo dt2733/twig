@@ -25,6 +25,7 @@ from loguru import logger
 from twig.utils import TwigError, set_log_level
 from twig.labeling.core import batch, display, rooting, treeio, writers
 from twig.labeling.core.constants import EXISTING_CHOICES, LEAF_NODE_CHOICES, PRECEDENCE_CHOICES, SELECT_ON_CHOICES
+from twig.labeling.core.display import count
 from twig.labeling.core.labelsets import (
     LabelingConfig,
     LabelingResult,
@@ -41,11 +42,6 @@ from twig.labeling.core.parsimony import to_fraction
 from twig.labeling.core.rules import resolve_rule
 from twig.labeling.core.sanitize import NameTable, label_name_problem
 from twig.labeling.core.validate import errors, warnings
-
-
-def _count(n: int, noun: str) -> str:
-    """Return a count with its noun, such as '1 branch' or '2 branches'."""
-    return f"{n} {noun}" if n == 1 else f"{n} {noun}es" if noun.endswith("ch") else f"{n} {noun}s"
 
 
 @contextmanager
@@ -161,8 +157,8 @@ def describe(result: LabelingResult, locus: str) -> list[str]:
     for report in result.reports:
         kind = f"{report.rule}, nuisance" if report.nuisance else report.rule
         line = (
-            f"{locus}: label {report.name} ({kind}) selected {_count(report.selected, 'tip')}, "
-            f"covers {_count(report.claimed, 'branch')} and keeps {report.kept}"
+            f"{locus}: label {report.name} ({kind}) selected {count(report.selected, 'tip')}, "
+            f"covers {count(report.claimed, 'branch')} and keeps {report.kept}"
         )
         if report.cost is not None:
             line += f", parsimony cost {report.cost}"
@@ -175,10 +171,10 @@ def summarize(labels: dict[int, str | None], result: LabelingResult, locus: str)
     counts = Counter(i for i in labels.values() if i)
     unlabeled = sum(1 for i in labels.values() if not i)
     parts = ", ".join(f"{label} {k}" for label, k in counts.most_common()) or "none"
-    line = f"{locus}: {_count(len(labels), 'branch')}, labeled {parts}, unlabeled {unlabeled}"
+    line = f"{locus}: {count(len(labels), 'branch')}, labeled {parts}, unlabeled {unlabeled}"
     stems = result.counts.get("stems", 0)
     if stems:
-        line += f", {_count(stems, 'stem')}"
+        line += f", {count(stems, 'stem')}"
     return line
 
 
@@ -207,7 +203,7 @@ def run_tree_label(args) -> None:
         species_of = lambda name: mapper.resolve(name).species or name  # noqa: E731
 
     records = list(batch.tree_records([args.input]))
-    logger.info(f"read {_count(len(records), 'tree')} from {args.input}")
+    logger.info(f"read {count(len(records), 'tree')} from {args.input}")
     if not sets:
         what = "are cleared" if config.existing == "clear" else "are kept"
         logger.info(f"no label sets were given, so the labels already in the tree {what}")
@@ -221,7 +217,7 @@ def run_tree_label(args) -> None:
         names.build()
         changed = names.changed()
         if changed:
-            logger.info(f"{_count(len(changed), 'tip name')} changed to be safe for {writer.sanitizer}" + (
+            logger.info(f"{count(len(changed), 'tip name')} changed to be safe for {writer.sanitizer}" + (
                 f", see {args.names_table}" if args.names_table else ", use --names-table to save the table"))
     elif args.names_table:
         logger.warning("--names-table is only used with -F hyphy")
@@ -306,6 +302,6 @@ def run_tree_label(args) -> None:
         logger.info(f"wrote the table of tip names to {args.names_table}")
     if args.out:
         batch.atomic_write(args.out, text, force=args.force)
-        logger.info(f"wrote {_count(len(pieces), 'tree')} to {args.out}")
+        logger.info(f"wrote {count(len(pieces), 'tree')} to {args.out}")
     else:
         batch.write_stdout(text)
