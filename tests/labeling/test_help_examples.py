@@ -61,7 +61,7 @@ class TestExamples:
         assert help_text.rstrip("\n").endswith(TREE_LABEL_EXAMPLES.rstrip("\n"))
 
     # options that the examples leave out, because they only change how the command talks or are explained by name-map
-    NOT_SHOWN = {"--help", "--force", "--log-level", "--accept-inferred", "--normalize", "--delim-idxs", "--delim-join"}
+    NOT_SHOWN = {"--help", "--force", "--log-level", "--delim-idxs", "--delim-join"}
 
     def test_there_is_an_example_of_every_rule_and_of_every_option(self):
         commands = " ".join(c for c, _ in parse_examples(TREE_LABEL_EXAMPLES))

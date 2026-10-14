@@ -12,7 +12,7 @@ This module does not import toytree.
 from __future__ import annotations
 
 from collections import Counter
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 
 from twig.labeling.core.model import RootMerge
 
@@ -37,6 +37,12 @@ def count(n: int, noun: str, plural: str | None = None) -> str:
         else:
             plural = noun + "s"
     return f"{n} {plural}"
+
+
+def shown(items: Sequence[str], limit: int) -> str:
+    """Return items joined by commas and cut after `limit`, such as 'a, b and 3 more'."""
+    text = ", ".join(items[:limit])
+    return text + f" and {len(items) - limit} more" if len(items) > limit else text
 
 
 def names_below(tree, name_of: Callable[[str], str], limit: int) -> dict[int, list[str]]:

@@ -329,14 +329,15 @@ def reroot(
     tree,
     outgroups: Sequence[str],
     policy: str = "unlabel",
-    species_of: Callable[[str], str] | None = None,
+    species_of: Callable[[str], str | None] | None = None,
 ) -> Rooted:
     """Return the tree rooted on the first outgroup that fits.
 
     Each outgroup is a clade of tips joined by commas, and is used if some of its
     tips are in the tree and they are one side of a branch. Outgroups are tried in
     the order given. With `species_of` the outgroup names are species and not tip
-    names, so one outgroup works for trees with several samples per species.
+    names, so one outgroup works for trees with several samples per species, and
+    a tip whose species is None belongs to no outgroup.
     """
     check_root_edge_policy(policy)
     clades = parse_outgroups(outgroups)

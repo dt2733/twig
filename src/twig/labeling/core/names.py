@@ -228,6 +228,25 @@ def parse_map_file(path: str | Path) -> list[MapRow]:
 # vocabulary
 ###########################################################################
 
+def read_vocab_list(path: str | Path) -> list[str]:
+    """Return the species names listed in a file, one per line.
+
+    Blank lines and lines that start with # are skipped, and only the first
+    word of a line is used.
+    """
+    path = Path(path)
+    try:
+        text = path.read_text(encoding="utf-8-sig")       # utf-8-sig drops a byte order mark
+    except OSError as exc:
+        raise TwigError(f"cannot read species list {path}: {exc}") from exc
+    except UnicodeDecodeError as exc:
+        raise TwigError(f"species list {path} is not valid UTF-8 text") from exc
+    names = [line.split()[0] for line in text.splitlines() if line.strip() and not line.strip().startswith("#")]
+    if not names:
+        raise TwigError(f"{path}: no species names found")
+    return names
+
+
 class Vocabulary:
     """The species names that raw names are matched to.
 

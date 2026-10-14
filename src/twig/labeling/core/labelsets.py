@@ -215,14 +215,15 @@ def select_tips(
     values: Sequence[str],
     exact: bool = False,
     select_on: str = "name",
-    species_of: Callable[[str], str] | None = None,
+    species_of: Callable[[str], str | None] | None = None,
 ) -> tuple[frozenset[int], list[str]]:
     """Return the idx of the tips chosen by selector values, and unused entries.
 
     With select_on species the selectors are matched to the species of each tip
     instead of to its name, so one selection works on trees with several samples
-    per species. The unused entries are listed names and patterns that matched
-    no tip, which helps to find typos.
+    per species. A tip whose species is None, because its name could not be
+    resolved, is never chosen. The unused entries are listed names and patterns
+    that matched no tip, which helps to find typos.
     """
     if select_on == "species" and species_of is None:
         raise TwigError("selecting on species needs a way to map names to species")
@@ -231,8 +232,8 @@ def select_tips(
         node.idx: (species_of(node.name) if select_on == "species" else node.name)
         for node in tree if node.is_leaf()
     }
-    chosen = frozenset(idx for idx, key in keys.items() if selector.matches(key))
-    return chosen, selector.unused(set(keys.values()))
+    chosen = frozenset(idx for idx, key in keys.items() if key is not None and selector.matches(key))
+    return chosen, selector.unused({key for key in keys.values() if key is not None})
 
 
 ###########################################################################
@@ -393,7 +394,7 @@ def apply_label_sets(
     tree,
     sets: Sequence[LabelSet],
     config: LabelingConfig = LabelingConfig(),
-    species_of: Callable[[str], str] | None = None,
+    species_of: Callable[[str], str | None] | None = None,
 ) -> LabelingResult:
     """Return the labels that a tree gets from label sets.
 
@@ -403,7 +404,8 @@ def apply_label_sets(
     Tip labels can be skipped, stems and losses are unlabeled or renamed, and the
     background label goes to every branch that is still free, except stems,
     losses, ambiguous branches and skipped tips that were deliberately left
-    unlabeled.
+    unlabeled. When selecting on species, a tip whose species is None is chosen
+    by no selector, and by no inverted selection either.
     """
     check_settings(sets, config)
     warnings: list[str] = []
@@ -418,7 +420,10 @@ def apply_label_sets(
         chosen, unused = select_tips(tree, item.values, config.exact, config.select_on, species_of)
         pieces = [select_tips(tree, [v], config.exact, config.select_on, species_of)[0] for v in item.values]
         if config.invert and not item.nuisance:
-            everything = frozenset(node.idx for node in leaves)
+            everything = frozenset(
+                node.idx for node in leaves
+                if config.select_on != "species" or species_of(node.name) is not None
+            )
             chosen = everything - chosen
             pieces = [chosen]
         report.selected, report.unused = len(chosen), unused

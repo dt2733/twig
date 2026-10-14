@@ -9,7 +9,7 @@ toytree is imported only by the run modules and the library.
 
 from __future__ import annotations
 
-from argparse import ArgumentParser
+from argparse import ArgumentParser, _ArgumentGroup
 from pathlib import Path
 from textwrap import dedent
 
@@ -27,6 +27,7 @@ from twig.labeling.core.constants import (
     RULE_NAMES,
     SELECT_ON_CHOICES,
     SHOW_CHOICES,
+    TREE_LABEL_UNMAPPED,
     UNMAPPED_POLICIES,
 )
 
@@ -49,11 +50,12 @@ def _create(parent, kwargs: dict) -> ArgumentParser:
     return ArgumentParser(**kwargs)
 
 
-def add_taxon_mapping_args(parser: ArgumentParser, unmapped: bool = True) -> None:
-    """Add the group of options that map sample names to species.
+def add_taxon_mapping_args(parser: ArgumentParser, unmapped: bool = True) -> _ArgumentGroup:
+    """Add the group of options that map sample names to species, and return it.
 
     The group is the same in every labeling command. The option to choose what
-    happens to unresolved names is added only by commands that act on them.
+    happens to unresolved names is added only by commands that act on them,
+    and a command can add options of its own to the group that is returned.
     """
     group = parser.add_argument_group("Taxon Mapping")
     group.add_argument("-I", "--imap", type=Path, metavar="path", help="map file rows <sample> <species> [specimen]; ~regex rows allowed")
@@ -66,6 +68,7 @@ def add_taxon_mapping_args(parser: ArgumentParser, unmapped: bool = True) -> Non
     group.add_argument("--accept-inferred", action="store_true", help="accept genus-abbreviation matches")
     if unmapped:
         group.add_argument("-U", "--unmapped", type=str, metavar="str", choices=UNMAPPED_POLICIES, default="error", help="what to do with names that cannot be resolved (error, skip, drop, ignore) [%(default)s]")
+    return group
 
 
 def add_writer_args(parser: ArgumentParser) -> None:
@@ -329,6 +332,28 @@ $ printf 'A_1 A\nA_2 A\nB_1 B\nC_1 C\n' > map.txt
 $ twig tree-label -i gene.nwk -L Test A --select-on species -I map.txt --rule tips
 ((A_1{Test},A_2{Test}),(B_1,C_1));
 
+A tip that the map file, delimiter or regex does not resolve stops the run with a
+list of such tips, because it would otherwise become a species of its own without
+a word. The option -U ignore leaves such tips without a species instead.
+
+# B_1 is not in the map file, so -U ignore leaves it without a species and ^[AB]$ chooses only A
+$ printf 'A_1 A\nA_2 A\nC_1 C\n' > part.txt
+$ twig tree-label -i gene.nwk -L Test '^[AB]$' --select-on species -I part.txt --rule tips -U ignore
+((A_1{Test},A_2{Test}),(B_1,C_1));
+
+With -V and a list of species, each tip name is matched to the species as name-map
+does, so names written in several ways find their species. A match by an
+abbreviated genus, such as A_hybridus_s1, counts only with --accept-inferred.
+
+$ echo '((Amaranthus_pumilus_s1,AmaranthusPumilus-s2),(Beta_vulgaris_s1,A_hybridus_s1));' > mixed.nwk
+$ printf 'Amaranthus_pumilus\nAmaranthus_hybridus\nBeta_vulgaris\n' > species.txt
+$ twig tree-label -i mixed.nwk -L Test ^Amaranthus --select-on species -V species.txt --accept-inferred --rule tips
+((Amaranthus_pumilus_s1{Test},AmaranthusPumilus-s2{Test}),(Beta_vulgaris_s1,A_hybridus_s1{Test}));
+
+# -N chooses how names are compared, and with -N none the case must agree, so AmaranthusPumilus-s2 is not resolved
+$ twig tree-label -i mixed.nwk -L Test ^Amaranthus --select-on species -V species.txt --accept-inferred -N none -U ignore --rule tips
+((Amaranthus_pumilus_s1{Test},AmaranthusPumilus-s2),(Beta_vulgaris_s1,A_hybridus_s1{Test}));
+
 Several labels
 --------------
 # repeat -L for more labels, each with its own rule
@@ -493,7 +518,7 @@ def get_parser_tree_label(parser: ArgumentParser | None = None) -> ArgumentParse
     select.add_argument("--nuisance", type=str, metavar="str", nargs="+", help="species to set aside for any reason, such as a reversion, an uncertain trait or poor data. They get a label of their own that no other label overwrites, and parsimony treats their state as unknown")
     select.add_argument("--nuisance-label", type=str, metavar="str", default=DEFAULT_NUISANCE_LABEL, help="the label given to nuisance tips [%(default)s]")
     select.add_argument("--rule", "--internal-nodes", dest="rule", type=str, metavar="str", default="all", help="how far a label spreads from the chosen tips (" + ", ".join(RULE_NAMES) + "). tips is only the chosen tips, all adds the branches whose tips are all chosen, crown is all without the branch at the base of each group, some is every branch with a chosen tip below it, fitch (also called parsimony) is the branches where the trait is inferred to be present, and clade and stem start at the common ancestor of the chosen tips and label its branch and everything below it, or only its branch. HyPhy names such as 'All descendants' work too [%(default)s]")
-    select.add_argument("--select-on", type=str, metavar="str", choices=SELECT_ON_CHOICES, default="name", help="match the chosen names to the names of the tips, or to the species of the tips when several samples belong to one species (" + ", ".join(SELECT_ON_CHOICES) + ") [%(default)s]")
+    select.add_argument("--select-on", type=str, metavar="str", choices=SELECT_ON_CHOICES, default="name", help="match the chosen names to the names of the tips, or to the species of the tips when several samples belong to one species, which the Taxon Mapping options find (" + ", ".join(SELECT_ON_CHOICES) + ") [%(default)s]")
     select.add_argument("--exact", action="store_true", help="treat the names given on the command line as exact names, so that A does not also match MA")
     select.add_argument("--invert", action="store_true", help="label the tips that are not chosen")
     select.add_argument("--leaf-nodes", type=str, metavar="str", choices=LEAF_NODE_CHOICES, default="label", help="label the tips as usual, or remove the labels of tips after the rule has run (" + ", ".join(LEAF_NODE_CHOICES) + ") [%(default)s]")
@@ -511,7 +536,9 @@ def get_parser_tree_label(parser: ArgumentParser | None = None) -> ArgumentParse
     pars.add_argument("--unknown", type=str, metavar="str", nargs="+", help="tips whose state is not known, so that parsimony may give them either state")
     pars.add_argument("--root-state", type=str, metavar="str", choices=ROOT_STATE_CHOICES, default="free", help="force the root to lack the trait (0) or to have it (1), or let parsimony choose (" + ", ".join(ROOT_STATE_CHOICES) + ") [%(default)s]")
 
-    add_taxon_mapping_args(parser, unmapped=False)
+    mapping = add_taxon_mapping_args(parser, unmapped=False)
+    mapping.add_argument("-V", "--vocab", type=Path, metavar="path", help="file listing species names, one per line. Each tip name is then matched to these species as name-map does, which is when -N and --accept-inferred apply")
+    mapping.add_argument("-U", "--unmapped", type=str, metavar="str", choices=TREE_LABEL_UNMAPPED, default="error", help="what to do with tip names that the map file, delimiter, regex or species list cannot resolve to one species (" + ", ".join(TREE_LABEL_UNMAPPED) + "). error stops the run and lists them, and ignore leaves them in the tree without a species, so that no selector chooses them [%(default)s]")
     add_writer_args(parser)
 
     runtime = parser.add_argument_group("Runtime")

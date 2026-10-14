@@ -22,8 +22,9 @@ NORMALIZE_STEPS = ("accents", "camel", "digits", "sep", "case")
 DEFAULT_NORMALIZE = ("accents", "camel", "sep", "case")
 NORMALIZE_CHOICES = NORMALIZE_STEPS + ("none",)
 
-# what to do with names that cannot be resolved to a species
+# what to do with names that cannot be resolved to a species, in general and in tree-label
 UNMAPPED_POLICIES = ("error", "skip", "drop", "ignore")
+TREE_LABEL_UNMAPPED = ("error", "ignore")
 
 # rows printed by name-map
 SHOW_CHOICES = ("all", "problems")

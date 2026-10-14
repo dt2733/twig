@@ -362,6 +362,13 @@ class TestReroot:
         with pytest.raises(TwigError, match="none of the outgroups"):
             rooting.reroot(tree, ["A"])
 
+    def test_a_tip_without_a_species_is_in_no_outgroup(self):
+        tree = treeio.read_tree("((A_1,A_2),((B_1,B_2),C_1));")
+        species = {"A_1": "A", "A_2": None, "B_1": "B", "B_2": "B", "C_1": "C"}.get
+        result = rooting.reroot(tree, ["A"], species_of=species)
+        side = result.tree[result.outgroup_side]
+        assert {l.name for l in side.traverse() if l.is_leaf()} == {"A_1"}
+
     def test_unrooted_trees_can_be_rooted(self):
         tree = treeio.read_tree("((M1,(A,(B,C))),(M2,(D,E)),O);")
         result = rooting.reroot(tree, ["O"])

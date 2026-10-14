@@ -58,7 +58,7 @@ Selection:
   --rule, --internal-nodes str     how far a label spreads from the chosen tips (tips, all, crown, some, fitch, clade, stem). tips is only the chosen tips, all adds the branches whose tips are all chosen, crown is all
                                    without the branch at the base of each group, some is every branch with a chosen tip below it, fitch (also called parsimony) is the branches where the trait is inferred to be present,
                                    and clade and stem start at the common ancestor of the chosen tips and label its branch and everything below it, or only its branch. HyPhy names such as 'All descendants' work too [all]
-  --select-on str                  match the chosen names to the names of the tips, or to the species of the tips when several samples belong to one species (name, species) [name]
+  --select-on str                  match the chosen names to the names of the tips, or to the species of the tips when several samples belong to one species, which the Taxon Mapping options find (name, species) [name]
   --exact                          treat the names given on the command line as exact names, so that A does not also match MA
   --invert                         label the tips that are not chosen
   --leaf-nodes str                 label the tips as usual, or remove the labels of tips after the rule has run (label, skip) [label]
@@ -88,6 +88,9 @@ Taxon Mapping:
   -dj, --delim-join str            join string for kept tokens [same as --delim]
   -N, --normalize str [str ...]    normalization steps used for matching, or none. The steps given replace the default list rather than adding to it [accents camel sep case]
   --accept-inferred                accept genus-abbreviation matches
+  -V, --vocab path                 file listing species names, one per line. Each tip name is then matched to these species as name-map does, which is when -N and --accept-inferred apply
+  -U, --unmapped str               what to do with tip names that the map file, delimiter, regex or species list cannot resolve to one species (error, ignore). error stops the run and lists them, and ignore leaves them
+                                   in the tree without a species, so that no selector chooses them [error]
 
 Output Format:
   --root-edges str                 HyPhy and PAML read a rooted tree as unrooted and see the two branches at its root as one branch. This sets the label of that branch (unlabel, labeled, outgroup, ingroup, error).
@@ -272,6 +275,28 @@ $ printf 'A_1 A\nA_2 A\nB_1 B\nC_1 C\n' > map.txt
 $ twig tree-label -i gene.nwk -L Test A --select-on species -I map.txt --rule tips
 ((A_1{Test},A_2{Test}),(B_1,C_1));
 
+A tip that the map file, delimiter or regex does not resolve stops the run with a
+list of such tips, because it would otherwise become a species of its own without
+a word. The option -U ignore leaves such tips without a species instead.
+
+# B_1 is not in the map file, so -U ignore leaves it without a species and ^[AB]$ chooses only A
+$ printf 'A_1 A\nA_2 A\nC_1 C\n' > part.txt
+$ twig tree-label -i gene.nwk -L Test '^[AB]$' --select-on species -I part.txt --rule tips -U ignore
+((A_1{Test},A_2{Test}),(B_1,C_1));
+
+With -V and a list of species, each tip name is matched to the species as name-map
+does, so names written in several ways find their species. A match by an
+abbreviated genus, such as A_hybridus_s1, counts only with --accept-inferred.
+
+$ echo '((Amaranthus_pumilus_s1,AmaranthusPumilus-s2),(Beta_vulgaris_s1,A_hybridus_s1));' > mixed.nwk
+$ printf 'Amaranthus_pumilus\nAmaranthus_hybridus\nBeta_vulgaris\n' > species.txt
+$ twig tree-label -i mixed.nwk -L Test ^Amaranthus --select-on species -V species.txt --accept-inferred --rule tips
+((Amaranthus_pumilus_s1{Test},AmaranthusPumilus-s2{Test}),(Beta_vulgaris_s1,A_hybridus_s1{Test}));
+
+# -N chooses how names are compared, and with -N none the case must agree, so AmaranthusPumilus-s2 is not resolved
+$ twig tree-label -i mixed.nwk -L Test ^Amaranthus --select-on species -V species.txt --accept-inferred -N none -U ignore --rule tips
+((Amaranthus_pumilus_s1{Test},AmaranthusPumilus-s2),(Beta_vulgaris_s1,A_hybridus_s1{Test}));
+
 Several labels
 --------------
 # repeat -L for more labels, each with its own rule
@@ -399,7 +424,9 @@ In PAML `#0` marks the background, which is the same as no mark, so it gives no 
 
 A selector is either a list file or a regular expression. A value that names an existing file is read as a list with one name per line, where a line that starts with `~` is a regular expression and a line that starts with `#` is a comment. Any other value is a regular expression that is matched with `re.search`, so `A` matches every name that contains an A. The option `--exact` treats the values given on the command line as exact names, and `--invert` labels the tips that the selectors do not match.
 
-With `--select-on species` the selectors are matched to the species of each tip, which makes one selection work on gene trees that have several samples per species. The species come from the Taxon Mapping options, which are the same as in [name-map](name-map.md). For example `-d _` takes the part of each name before the first underscore. Without a map file, delimiter or regex, every tip is its own species, and the command says so.
+With `--select-on species` the selectors are matched to the species of each tip, which makes one selection work on gene trees that have several samples per species. The species come from the Taxon Mapping options, which work as in [name-map](name-map.md). A map file given with `-I` names the species of each sample, `-d _` takes the part of each name before the first underscore, and `-x` takes the group `species` of a regular expression. With a list of species given with `-V`, one per line, a tip name, or the part of it that `-d` or `-x` takes, is matched to the list by the rules of name-map, so `AmaranthusPumilus-s2` finds `Amaranthus_pumilus`. The options `-N` and `--accept-inferred` act only on this matching, so without `-V` they have no effect and the command says so, as it does for any Taxon Mapping option given without `--select-on species`. Without any of `-I`, `-d`, `-x` and `-V` every tip is its own species, and the command says so too.
+
+When any of these four options is given, every tip name must resolve to one species. A name that no map row, delimiter or regex resolves, such as a name without the delimiter, or a name that matches no species of the list, several species equally well, or a species only by an abbreviated genus without `--accept-inferred`, would otherwise become a species of its own without a word. The default `-U error` stops the run before any tree is labeled and lists every such name with the reason. The value `-U ignore` leaves these tips in the tree without a species and names them in a warning. No selector chooses such a tip, not even with `--invert`, `--unknown`, `--nuisance` or an outgroup given to `-r`, and the listing of `--show` and the branch table show it by its name. The values `skip` and `drop` that the design lists for other commands are not offered, because tree-label labels the trees it is given and does not choose or prune them. To check the names of many trees at once, and to freeze the mapping into a map file for `-I`, use `twig name-map`.
 
 Every label reports how many tips it selected, how many branches it covers, and how many keep its label in the end, after precedence, `--leaf-nodes skip` and `--stems`. A label that loses branches to another label, or to a label that the tree already had, says how many and which option decided it, so a label that was overridden never goes unnoticed. Names or patterns that match no tip are reported too, which helps to find typos.
 

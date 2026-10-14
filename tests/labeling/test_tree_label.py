@@ -561,6 +561,99 @@ class TestSeveralLabels:
         _, _, err = run(f"-i {NAMED} -L Test A --select-on species --rule tips")
         assert "every tip is its own species" in err
 
+
+class TestSpeciesMapping:
+    @pytest.fixture
+    def gene(self, tmp_path):
+        tree = tmp_path / "g.nwk"
+        tree.write_text("((s1,s3),(s2,s4));")
+        return tree
+
+    def test_a_tip_missing_from_the_map_stops_the_run(self, run, gene, tmp_path):
+        # s3 used to become a species of its own, so it was silently left out of Test
+        mapping = tmp_path / "map.txt"
+        mapping.write_text("s1 Amaranthus_pumilus\ns2 Beta_vulgaris\ns4 Beta_vulgaris\n")
+        command = f"-i {gene} -L Test Amaranthus_pumilus --select-on species -I {mapping} --rule all --background Reference --exact"
+        code, out, err = run(command)
+        assert code == 1 and out == ""
+        assert "1 tip name cannot be resolved to a species, so -U error stops the run\n  s3 (it is not resolved by the map file)\n" in err
+        assert "give -U ignore" in err
+
+    def test_ignore_leaves_the_tip_without_a_species(self, run, gene, tmp_path):
+        mapping = tmp_path / "map.txt"
+        mapping.write_text("s1 Amaranthus_pumilus\ns2 Beta_vulgaris\ns4 Beta_vulgaris\n")
+        code, out, err = run(f"-i {gene} -L Test Amaranthus_pumilus --select-on species -I {mapping} --rule all --background Reference --exact -U ignore")
+        assert code == 0, err
+        assert out == "((s1{Test},s3{Reference}){Reference},(s2{Reference},s4{Reference}){Reference});\n"
+        assert "1 tip name cannot be resolved to a species, so -U ignore leaves it without one and no selector chooses it. s3 (it is not resolved by the map file)" in err
+        # its own name does not make it a species that a selector or --invert can choose
+        _, out, _ = run(f"-i {gene} -L Test s3 --select-on species -I {mapping} --rule tips -U ignore")
+        assert out == "((s1,s3),(s2,s4));\n"
+        _, out, _ = run(f"-i {gene} -L Test Beta_vulgaris --invert --select-on species -I {mapping} --rule tips -U ignore")
+        assert out == "((s1{Test},s3),(s2,s4));\n"
+
+    def test_a_name_without_the_delimiter_is_not_resolved(self, run, tmp_path):
+        tree = tmp_path / "g.nwk"
+        tree.write_text("(O_1,((M1_1,((A_1,A_2),(B_1,C_1))),(M2_1,(D_1,Ee))));")
+        code, _, err = run(f"-i {tree} -L Test ^[ABDE]$ --select-on species -d _ --rule all")
+        assert code == 1 and "  Ee (it is not resolved by the delimiter)" in err
+        code, out, err = run(f"-i {tree} -L Test ^[ABDE]$ --select-on species -d _ --rule all -U ignore")
+        assert code == 0 and "Ee (it is not resolved by the delimiter)" in err
+        assert "(D_1{Test},Ee)" in out
+
+    def test_every_name_missing_from_a_map_is_listed(self, run, data_dir, tmp_path):
+        mapping = tmp_path / "map.txt"
+        mapping.write_text("A_1 A\nB_1 B\n")
+        code, _, err = run(f"-i {data_dir / 'gene.nwk'} -L Test ^A$ --select-on species -I {mapping} --rule tips")
+        assert code == 1 and "7 tip names cannot be resolved to a species" in err
+        listed = [line.split()[0] for line in err.splitlines() if line.startswith("  ")]
+        assert listed == ["O_1", "M1_1", "A_2", "C_1", "M2_1", "D_1", "E_1"]
+
+    def test_a_species_list_resolves_names_written_in_several_ways(self, run, tmp_path):
+        tree = tmp_path / "mixed.nwk"
+        tree.write_text("((Amaranthus_pumilus_s1,AmaranthusPumilus-s2),(Beta_vulgaris_s1,A_hybridus_s1));")
+        species = tmp_path / "species.txt"
+        species.write_text("Amaranthus_pumilus\nAmaranthus_hybridus\nBeta_vulgaris\n")
+        command = f"-i {tree} -L Test ^Amaranthus --select-on species -V {species} --rule tips"
+        code, _, err = run(command)
+        assert code == 1 and "A_hybridus_s1 (only an abbreviated genus matches it to Amaranthus_hybridus, which --accept-inferred accepts)" in err
+        code, out, err = run(command + " --accept-inferred")
+        assert code == 0, err
+        assert out == "((Amaranthus_pumilus_s1{Test},AmaranthusPumilus-s2{Test}),(Beta_vulgaris_s1,A_hybridus_s1{Test}));\n"
+        # without case folding AmaranthusPumilus-s2 is not resolved
+        code, out, err = run(command + " --accept-inferred -N none -U ignore")
+        assert out == "((Amaranthus_pumilus_s1{Test},AmaranthusPumilus-s2),(Beta_vulgaris_s1,A_hybridus_s1{Test}));\n"
+        assert "AmaranthusPumilus-s2 (it matches no species of the species list, the closest are Amaranthus_pumilus" in err
+
+    def test_ambiguous_names_and_map_rows_are_checked_against_the_species_list(self, run, tmp_path):
+        tree = tmp_path / "g.nwk"
+        tree.write_text("((A_pumilus_s1,Beta_vulgaris_s1),x1);")
+        species = tmp_path / "species.txt"
+        species.write_text("Amaranthus_pumilus\nAtriplex_pumilus\nBeta_vulgaris\n")
+        code, _, err = run(f"-i {tree} -L Test Beta_vulgaris --select-on species -V {species} --accept-inferred --rule tips")
+        assert code == 1 and "A_pumilus_s1 (it matches Atriplex_pumilus and Amaranthus_pumilus equally well)" in err
+        mapping = tmp_path / "map.txt"
+        mapping.write_text("A_pumilus_s1 Amaranthus_pumilus\nx1 Beta_vulgarus\n")
+        code, _, err = run(f"-i {tree} -L Test Beta_vulgaris --select-on species -V {species} -I {mapping} --rule tips")
+        assert code == 1 and "species 'Beta_vulgarus' is not in the species tree" in err
+        mapping.write_text("A_pumilus_s1 Amaranthus_pumilus\nx1 Beta_vulgaris\n")
+        code, out, err = run(f"-i {tree} -L Test Beta_vulgaris --select-on species -V {species} -I {mapping} --rule tips")
+        assert code == 0 and out == "((A_pumilus_s1,Beta_vulgaris_s1{Test}),x1{Test});\n"
+
+    def test_mapping_options_that_have_no_effect_are_reported(self, run, data_dir, tmp_path):
+        gene = data_dir / "gene.nwk"
+        _, _, err = run(f"-i {gene} -L Test ^A$ -d _ -N none --rule tips")
+        assert "-d and -N have no effect without --select-on species" in err
+        for extra in ("--accept-inferred", "-N none", "-N digits"):
+            _, _, err = run(f"-i {gene} -L Test A --select-on species -d _ --rule tips {extra}")
+            assert "no effect without a species list given with -V" in err, extra
+        _, _, err = run(f"-i {gene} -L Test A --select-on species -x ^(?P<species>[^_]+)_ -di 1 --rule tips")
+        assert "-di has no effect without -d" in err
+        species = tmp_path / "species.txt"
+        species.write_text("A\nB\nC\nD\nE\nO\nM1\nM2\n")
+        _, _, err = run(f"-i {gene} -L Test A --select-on species -d _ -V {species} -N none --rule tips")
+        assert "no effect" not in err
+
     def test_parsimony_options_that_change_nothing_are_reported(self, run):
         code, _, err = run(f"-i {NAMED} -L Test:all {DIOECIOUS} --losses Rev --ambiguous Amb --gain-cost 5")
         assert code == 0 and "no label uses the fitch rule, so --losses, --ambiguous and --gain-cost have no effect" in err

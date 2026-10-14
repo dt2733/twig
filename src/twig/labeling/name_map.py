@@ -25,8 +25,8 @@ from loguru import logger
 
 from twig.utils import TwigError, set_log_level
 from twig.labeling.core import batch, fasta, treeio
-from twig.labeling.core.display import count
-from twig.labeling.core.names import NameHit, NameMapper, write_frozen_map, write_hit_table
+from twig.labeling.core.display import count, shown
+from twig.labeling.core.names import NameHit, NameMapper, read_vocab_list, write_frozen_map, write_hit_table
 
 # how many items of a long list are shown in a log message
 SHOWN = 8
@@ -52,20 +52,6 @@ class Unit:
         return [name for name, k in Counter(self.names).items() if k > 1]
 
 
-def read_vocab_list(path: Path) -> list[str]:
-    """Return the species names listed in a file, one per line."""
-    try:
-        text = path.read_text(encoding="utf-8-sig")       # utf-8-sig drops a byte order mark
-    except OSError as exc:
-        raise TwigError(f"cannot read species list {path}: {exc}") from exc
-    except UnicodeDecodeError as exc:
-        raise TwigError(f"species list {path} is not valid UTF-8 text") from exc
-    names = [line.split()[0] for line in text.splitlines() if line.strip() and not line.strip().startswith("#")]
-    if not names:
-        raise TwigError(f"{path}: no species names found")
-    return names
-
-
 def read_units(items: list[Path]) -> list[Unit]:
     """Return the names in every tree and FASTA file named by the inputs."""
     units: list[Unit] = []
@@ -89,12 +75,6 @@ def read_units(items: list[Path]) -> list[Unit]:
     if not units:
         raise TwigError("no names were found in the input files")
     return units
-
-
-def _shown(items: list[str], limit: int = SHOWN) -> str:
-    """Return a comma separated list that is cut after `limit` items."""
-    text = ", ".join(items[:limit])
-    return text + f" and {len(items) - limit} more" if len(items) > limit else text
 
 
 def check_outputs(args) -> None:
@@ -125,7 +105,7 @@ def summarize(hits: list[NameHit], units: list[Unit], vocabulary: list[str] | No
         repeated = unit.repeated()
         if repeated:
             verb = "occurs" if len(repeated) == 1 else "occur"
-            logger.warning(f"{count(len(repeated), 'name')} {verb} more than once in {unit.where()}. {_shown(repeated)}")
+            logger.warning(f"{count(len(repeated), 'name')} {verb} more than once in {unit.where()}. {shown(repeated, SHOWN)}")
 
     n_files = len({u.path for u in units})
     n_trees = sum(u.kind == "tree" for u in units)
@@ -146,14 +126,14 @@ def summarize(hits: list[NameHit], units: list[Unit], vocabulary: list[str] | No
         if rows:
             detail = [f"{h.name} ({', '.join(c[0] for c in h.candidates[:3]) or h.species})" for h in rows]
             verb = "is" if len(rows) == 1 else "are"
-            logger.warning(f"{count(len(rows), 'name')} {verb} {text}. {_shown(detail)}")
+            logger.warning(f"{count(len(rows), 'name')} {verb} {text}. {shown(detail, SHOWN)}")
 
     if vocabulary:
         used = {h.species for h in hits if h.species}
         missing = [s for s in vocabulary if s not in used]
         if missing:
             verb = "has" if len(missing) == 1 else "have"
-            logger.info(f"{count(len(missing), 'species')} {verb} no samples. {_shown(missing)}")
+            logger.info(f"{count(len(missing), 'species')} {verb} no samples. {shown(missing, SHOWN)}")
 
     leftovers: dict[str, Counter] = defaultdict(Counter)
     for hit in hits:
@@ -163,7 +143,7 @@ def summarize(hits: list[NameHit], units: list[Unit], vocabulary: list[str] | No
                     leftovers[hit.species][token] += 1
     for species, counter in sorted(leftovers.items()):
         verb = "is" if len(counter) == 1 else "are"
-        logger.warning(f"{count(len(counter), 'word')} {verb} left after the species name in the names of {species}. {_shown(sorted(counter))}")
+        logger.warning(f"{count(len(counter), 'word')} {verb} left after the species name in the names of {species}. {shown(sorted(counter), SHOWN)}")
 
     by_species: dict[str, list[int]] = defaultdict(list)
     species_of = {h.name: h.species for h in hits}

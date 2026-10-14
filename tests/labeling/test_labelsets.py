@@ -385,6 +385,19 @@ class TestPrecedence:
         result = apply_label_sets(tree, [LabelSet("Test", "all", ("a",))], cfg(select_on="species"), species_of=species)
         assert sorted(tree[i].name for i, v in result.labels.items() if v and tree[i].name) == ["a_1", "a_2"]
 
+    def test_a_tip_without_a_species_is_never_chosen(self):
+        # tree-label -U ignore gives tips that cannot be resolved the species None
+        tree = treeio.read_tree("((a_1,a_2),(b_1,c_1));")
+        species = {"a_1": "a", "a_2": None, "b_1": "b", "c_1": "c"}.get
+        chosen, unused = select_tips(tree, ["a_2", "a"], exact=True, select_on="species", species_of=species)
+        assert sorted(tree[i].name for i in chosen) == ["a_1"] and unused == ["a_2"]
+        chosen, _ = select_tips(tree, ["."], select_on="species", species_of=species)
+        assert sorted(tree[i].name for i in chosen) == ["a_1", "b_1", "c_1"]
+        config = cfg(select_on="species", invert=True, unknown=("a_2",))
+        result = apply_label_sets(tree, [LabelSet("Test", "tips", ("a",))], config, species_of=species)
+        labeled = sorted(tree[i].name for i, v in result.labels.items() if v)
+        assert labeled == ["b_1", "c_1"]
+
 
 class TestWarningsAndErrors:
     def test_selectors_that_match_nothing_are_reported(self):
