@@ -86,7 +86,7 @@ The matching of a name to the species tree tries four steps and stops at the fir
 
 When several species match in the same step, the one that covers the most words wins, so `A_hybridus_quitensis_s1` goes to `A_hybridus_quitensis` when both species exist. When several species tie, the name is ambiguous. For example `A_pumilus_sample1` is ambiguous between `Amaranthus_pumilus` and `Atriplex_pumilus`, while `AmaranthusPumilus-Sample1` still resolves to the first.
 
-A match by abbreviation is only a guess about a genus, so it gets the status `inferred`. It is shown in the table, but other tree labeling commands do not accept it unless you freeze the mapping after reviewing it, or pass `--accept-inferred`. This way a sample of Atriplex that is missing from the species tree is never silently assigned to Amaranthus.
+A match by abbreviation is less certain than the other steps, because only the first letters of the genus agree, so it gets the status `inferred`. It is shown in the table, but other tree labeling commands do not accept it unless you freeze the mapping after reviewing it, or pass `--accept-inferred`. This way a sample of Atriplex that is missing from the species tree is never silently assigned to Amaranthus.
 
 The words that are left over after the species part of a name are reported in the `leftover` column. They are typically a specimen identifier such as `sample1`, but they can also expose a variety or a subspecies that is being lumped into a species, such as the `maritima` in `Beta_vulgaris_maritima_s1`.
 
@@ -168,7 +168,7 @@ status ambiguous 1, inferred 1, ok 10, unmapped 1
 1 name is ambiguous, matching more than one species. A_pumilus_sample1 (Atriplex_pumilus, Amaranthus_pumilus)
 1 name is unmapped, matching no species. Zea_mays_s1 (Beta_vulgaris, Amaranthus_pumilus, Amaranthus_hybridus)
 1 name is inferred, matched only by genus abbreviation (review and freeze with --freeze). A_hybridus_s1 (Amaranthus_hybridus)
-1 word is left after the species name in the names of Beta_vulgaris. maritima
+the names of Beta_vulgaris have 1 word after the species name, maritima
 Amaranthus_pumilus has up to 2 samples in one tree or FASTA file, which happens in 2 of the 4 where it occurs
 ```
 

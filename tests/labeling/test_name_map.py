@@ -57,7 +57,7 @@ class TestTable:
         assert "1 name is ambiguous, matching more than one species" in err
         assert "1 name is unmapped, matching no species" in err
         assert "1 name is inferred, matched only by genus abbreviation" in err
-        assert "1 word is left after the species name in the names of Beta_vulgaris. maritima" in err
+        assert "the names of Beta_vulgaris have 1 word after the species name, maritima" in err
         assert "Amaranthus_pumilus has up to 2 samples in one tree or FASTA file" in err
         assert "the species vocabulary has 5 species" in err
         assert "\tstatus\t" not in err      # the table itself is only written to stdout
@@ -78,7 +78,7 @@ class TestTable:
         code, _, err = run_twig(f"name-map -i {tree} -s {sp} --strict")
         assert "2 species have no samples. Zea_mays, Oryza_sativa" in err and "speciess" not in err
         assert "resolved 3 unique names from 1 file (1 tree, 0 FASTA files)" in err
-        assert "2 words are left after the species name in the names of Beta_vulgaris. maritima, x" in err
+        assert "the names of Beta_vulgaris have 2 words after the species name, maritima, x" in err
         assert code == 1 and "2 names need attention" in err
         tree.write_text("(Amaranthus_pumilus,Beta_vulgaris_maritima_s1);\n")
         code, _, err = run_twig(f"name-map -i {tree} -s {sp} --strict")

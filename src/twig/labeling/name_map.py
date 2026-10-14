@@ -142,8 +142,7 @@ def summarize(hits: list[NameHit], units: list[Unit], vocabulary: list[str] | No
                 if token.isalpha():
                     leftovers[hit.species][token] += 1
     for species, counter in sorted(leftovers.items()):
-        verb = "is" if len(counter) == 1 else "are"
-        logger.warning(f"{count(len(counter), 'word')} {verb} left after the species name in the names of {species}. {shown(sorted(counter), SHOWN)}")
+        logger.warning(f"the names of {species} have {count(len(counter), 'word')} after the species name, {shown(sorted(counter), SHOWN)}")
 
     by_species: dict[str, list[int]] = defaultdict(list)
     species_of = {h.name: h.species for h in hits}
