@@ -419,7 +419,7 @@ The option `--rule`, also called `--internal-nodes`, decides which branches a la
 | `clade` | not in HyPhy | for each selector, the branch above the common ancestor of its tips and everything below it |
 | `stem` | not in HyPhy | for each selector, only the branch above the common ancestor of its tips |
 
-The option `--leaf-nodes skip` removes the labels of tips after the rule has run. With `fitch` the tips still provide the data. A tip whose label was removed in this way is left out of the background as well. The rule `tips` together with `skip` is an error because it would label nothing. The rules `clade` and `stem` are errors when the common ancestor is the root, because the root has no branch.
+The option `--leaf-nodes skip` removes the labels of tips after the rule has run. With `fitch` the tips still provide the data. A tip whose label was removed in this way is left out of the background as well. The rule `tips` together with `skip` is an error because it would label nothing. HyPhy's own Skip mode works differently, as described under Coming from HyPhy below. The rules `clade` and `stem` are errors when the common ancestor is the root, because the root has no branch.
 
 The next table shows what each rule labels on the species tree when the selection is A, B, D and E. The internal branches are named in `species.named.nwk` as BC, ABC, X (M1 and its sister), DE, Y (M2 and its sister) and Z (the whole ingroup).
 
@@ -443,6 +443,22 @@ twig tree-label -i species.named.nwk -L Test dioecious.txt --rule fitch --intern
 (O,((M1,(A{Test},(B{Test},C)BC{Test})ABC{Test})X,(M2,(D{Test},E{Test})DE{Test})Y)Z);
 ```
 
+## Coming from HyPhy
+
+The options of the HyPhy `label-tree` script map onto `tree-label` as follows.
+
+| HyPhy `label-tree` | twig `tree-label` |
+|---|---|
+| `--regexp R --label L` | `-L L R` |
+| `--list F --label L` | `-L L F` |
+| `--internal-nodes "All descendants"` | `--rule all`, and the other HyPhy rule names work as well |
+| `--leaf-nodes Skip` | `--leaf-nodes skip`, which differs as described below |
+| `--reroot X` | `-r X` |
+| `--invert Yes` | `--invert` |
+| `--output F` | `-o F -F hyphy` |
+
+HyPhy's Skip mode is not the same as `--leaf-nodes skip`. With Skip, HyPhy works out the labels of internal branches directly from the selected tips and ignores the rules `All descendants, no MRCA` and `None`, so with Skip those two rules label other branches in HyPhy than in twig. twig does not copy this. It always runs the rule first and only then removes the labels of the tips, whatever the rule, so `crown` with `skip` still leaves out the branch at the base of each group, and `tips` with `skip` is an error. The rule `Parsimony` differs too, because HyPhy never gives the unselected tips a state, so its result is that of `all`, while in twig the name means real parsimony.
+
 ## Parsimony
 
 The name `fitch` needs a word of explanation. Parsimony means choosing the explanation that needs the fewest changes, and Fitch is Walter Fitch, who described this method in 1971. The rule `parsimony` means the same as `fitch`. Given the species that have a trait, it finds the fewest gains and losses of the trait on the tree that explain them. The `fitch` rule reconstructs a trait that is either absent or present, and labels every branch on which the trait is present. Selected tips have the trait, tips that are not selected do not, and tips given with `--unknown` cost nothing in either state. Gaining the trait costs `--gain-cost` and losing it costs `--loss-cost`, both 1 by default. The costs are kept as exact fractions, so equal totals are recognized without rounding errors, and a cost may be as large as you like. The two costs cannot both be 0, because every history would then cost nothing. The state of the root is free by default, and `--root-state 0` or `--root-state 1` fixes it. The costs, the root state, `--ambiguous`, `--unknown` and `--losses` act only on labels with the `fitch` rule, so the command warns when one of them is given and no label uses that rule. It also names the entries of `--unknown` that match no tip, as it does for the selectors of a label. If the root has three or more children, the tree is most likely unrooted, as IQ-TREE and ASTRAL write their trees, and the result depends on where its root is drawn, whatever the costs. A branch is labeled by the state of the node below it, so a basal node that falls inside the group with the trait changes the stems, the losses and the labels around it. The command warns in that case, and `-r` with the outgroup roots the tree first.
@@ -463,7 +479,7 @@ These three switches work with every rule and turn the result of a rule into the
 
 A stem is the internal branch on which a trait arose, so the change happened somewhere along its length. How it is found depends on the rule. With `fitch` a stem is a branch with a gain, which means the trait is present on it and absent in its parent, so a branch below the root is a stem only when the root lacks the trait. With `crown` a stem is the branch that the rule leaves out at the base of each group, so `--stems Stem` labels it, the background never takes it, and the first crown branch below it is not a stem. With the other rules a stem is a labeled internal branch whose parent branch does not carry the same label, and a branch below the root is a stem unless every child of the root carries the same label. A tip is never a stem, and neither is a branch with the label of `--ambiguous`. When `--stems` is unlabel or a name, the labels that are already in the tree count as well, as with the rules other than `fitch` and `crown`, so a tree labeled elsewhere, such as a PAML tree, can be turned into its crown or stem variant. twig cannot tell whether such a label marks a trait or whether its stems were handled before, so it names the stems it finds among them in a warning. The labels that the same run gives to the background, to losses and to nuisance species are never taken for traits. Use this on a tree whose stems have not been handled yet, because on the output of `--stems unlabel` the branch below each old stem would become a new stem. The option `--stems unlabel` leaves stems out of both the test and the reference set, and a name such as `--stems Stem` gives them a class of their own. With a class of their own, one labeled species tree supports both an analysis of the crown only and an analysis of stem plus crown, because the choice can be made later for each run.
 
-A loss is a branch with the trait absent whose parent has it present, which is a reversion to the ancestral state. Only parsimony finds losses, so `--losses` acts on the result of `fitch` and not on labels that are already in the tree. The option `--losses unlabel` leaves them unlabeled, and `--losses Rev` gives them the label Rev. You do not need to know which species are reversions, because any species can be set aside as a nuisance species, as described in the next section.
+A loss is a branch with the trait absent whose parent has it present, which is a reversion to the ancestral state. Only parsimony finds losses, so `--losses` acts on the result of `fitch` and not on labels that are already in the tree. With the default `--losses keep` a loss is a branch without the trait like any other, so `--background` labels it. The option `--losses unlabel` leaves losses unlabeled and out of the background, and `--losses Rev` gives them the label Rev. You do not need to know which species are reversions, because any species can be set aside as a nuisance species, as described in the next section.
 
 The option `--background Reference` gives the label Reference to every branch that no label covers, except the stems, losses, ambiguous branches and skipped tips that you deliberately left unlabeled. This makes the reference branches explicit.
 

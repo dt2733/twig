@@ -186,6 +186,16 @@ class TestTreeLabelPage:
             if hyphy != "not in HyPhy":
                 assert resolve_rule(hyphy) == rule.strip("`")
 
+    def test_the_hyphy_options_and_the_skip_mode_are_explained(self, text):
+        from twig.labeling.parsers import get_parser_tree_label
+        rows = table_rows(text, "| HyPhy `label-tree` | twig `tree-label` |")
+        assert len(rows) == 7
+        known = {o for a in get_parser_tree_label()._actions for o in a.option_strings}
+        for _, twig_side in rows:
+            flags = re.findall(r"(?<![\w-])(-{1,2}[A-Za-z][\w-]*)", twig_side.split("`")[1])
+            assert flags and set(flags) <= known, twig_side
+        assert "HyPhy's Skip mode is not the same as `--leaf-nodes skip`" in text
+
     def test_the_root_edge_values_are_listed(self, text):
         from twig.labeling.core.constants import ROOT_EDGE_POLICIES
         rows = table_rows(text, "| value | label of the joined branch |")
