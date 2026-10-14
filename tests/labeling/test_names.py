@@ -351,6 +351,29 @@ class TestWriters:
         # a reloaded map resolves the inferred name without any abbreviation rule
         assert NameMapper(map_rows=rows, vocabulary=SPECIES).resolve("A_hybridus_s1").status == "ok"
 
+    def test_specimen_keys_survive_a_frozen_map(self, tmp_path):
+        # map rows used to give no leftover, so every sample of a species had the key '' after a reload
+        mapper = NameMapper(vocabulary=SPECIES, accept_inferred=True)
+        names = ["AmaranthusPumilus-Sample1", "AmaranthusPumilus-Sample2", "A_hybridus_s1", "s012_Beta_vulgaris", "Beta_vulgaris"]
+        before = [mapper.resolve(n) for n in names]
+        assert [h.specimen_key for h in before] == ["sample1", "sample2", "s1", "s012", ""]
+        path = tmp_path / "frozen.tsv"
+        write_frozen_map(before, path)
+        reloaded = NameMapper(map_rows=parse_map_file(path), vocabulary=SPECIES)
+        after = [reloaded.resolve(n) for n in names]
+        assert {h.method for h in after} == {"map"}
+        assert [h.specimen_key for h in after] == [h.specimen_key for h in before]
+        assert [h.leftover for h in after] == [h.leftover for h in before]
+
+    def test_the_leftover_of_a_map_row_whose_species_is_not_in_the_name(self, tmp_path):
+        path = tmp_path / "map.tsv"
+        path.write_text("x1 Beta_vulgaris\n~^Ahyb[_-] Amaranthus_hybridus\nA_pumilus_s3 Amaranthus_pumilus\n")
+        mapper = NameMapper(map_rows=parse_map_file(path), vocabulary=SPECIES)
+        assert mapper.resolve("x1").leftover == ("x1",)
+        assert mapper.resolve("Ahyb-7").leftover == ("ahyb", "7")
+        # the abbreviated genus is part of the species, as it is for a match by abbreviation
+        assert mapper.resolve("A_pumilus_s3").leftover == ("s3",)
+
     def test_frozen_map_has_no_specimen_column_unless_explicit(self, tmp_path):
         mapper = NameMapper(vocabulary=SPECIES, regex=r"^(?P<species>[A-Za-z]+_[a-z]+)_(?P<specimen>s\d+)$")
         hits = [mapper.resolve("Beta_vulgaris_s1"), mapper.resolve("Amaranthus_pumilus_x1")]

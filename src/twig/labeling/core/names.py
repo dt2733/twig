@@ -439,6 +439,7 @@ class NameMapper:
                 self._exact_rows[row.sample] = row
 
         self._cache: dict[str, NameHit] = {}
+        self._row_vocabs: dict[str, Vocabulary] = {}
 
     @classmethod
     def from_args(cls, args, vocabulary: Iterable[str] | None = None) -> "NameMapper":
@@ -499,6 +500,21 @@ class NameMapper:
         """Return the canonical tokens of name that are not in the species part."""
         return _remove_run(tokens(canonical(name, self.steps)), used)
 
+    def _from_row(self, name: str, row: MapRow, method: str, specimen: str | None) -> NameHit:
+        """Return the hit for a name that a map row resolves.
+
+        The leftover words are found by matching the name to the species of
+        the row alone, so a sample keeps the same specimen key when its species
+        comes from a frozen map instead of from the vocabulary.
+        """
+        single = self._row_vocabs.get(row.species)
+        if single is None:
+            single = self._row_vocabs[row.species] = Vocabulary([row.species], self.steps)
+        _, found, used = single.match(name)
+        if not found:
+            used = tokens(canonical(row.species, self.steps))
+        return NameHit(name, row.species, row.specimen or specimen, method, "ok", self._leftover(name, used))
+
     def _from_vocab(self, name: str, text: str, specimen: str | None) -> NameHit:
         """Match text (the name or a key parsed from it) against the vocabulary."""
         method, found, used = self.vocab.match(text)
@@ -520,12 +536,12 @@ class NameMapper:
         for probe in (name, key):
             row = self._exact_rows.get(probe) if probe is not None else None
             if row is not None:
-                return NameHit(name, row.species, row.specimen or specimen, "map", "ok")
+                return self._from_row(name, row, "map", specimen)
 
         # 2. regex map rows
         for row in self._regex_rows:
             if row.pattern.search(name):
-                return NameHit(name, row.species, row.specimen or specimen, "map-regex", "ok")
+                return self._from_row(name, row, "map-regex", specimen)
 
         # 3. parsed key, matched to the vocabulary if there is one
         if key is not None:

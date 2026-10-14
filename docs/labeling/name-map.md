@@ -3,7 +3,7 @@
 
 The `twig name-map` tool resolves the name of every tip in a set of gene trees, and the name of every sequence in a set of FASTA files, to a species of your species tree. It prints a table so that you can check the result by eye, and it can freeze the resolved mapping into a file that the other tree labeling tools read. Run it first, because every later step depends on each tip being assigned to the right species.
 
-Gene trees often name the same species in several ways, for example `A_pumilus_sample1` in one gene and `AmaranthusPumilus-Sample1` in another, and they can hold several individuals of a species. The tool matches names to species exactly and also by tolerant rules, but it never guesses. A name that matches more than one species is reported as ambiguous, and a name that matches none is reported as unmapped with the closest species listed only as a suggestion.
+Gene trees often name the same species in several ways, for example `A_pumilus_sample1` in one gene and `AmaranthusPumilus-Sample1` in another, and they can hold several individuals of a species. The tool matches names to species exactly and also by tolerant rules, but it never assigns a species by similarity. A name that matches more than one species is reported as ambiguous, and a name that matches none is reported as unmapped with the closest species listed only as a suggestion.
 
 The example files used on this page are in `tests/labeling/data/names`, which holds three gene trees, two alignments and a species tree of five species.
 
@@ -143,7 +143,7 @@ Zea_mays_s1                -                    -         none    unmapped   -  
 | `candidates` | for names that are not resolved, the species that tie or the three most similar species with their similarity, which is only a suggestion |
 | `n_files` | the number of input files in which the name occurs |
 
-The method `self` is used when there is no species tree or species list and no parsing rule, in which case a name is its own species. The option `--show problems` prints only the rows that need attention, which are the names that are not `ok` and the names that have words left over.
+The method `self` is used when there is no species tree or species list and no parsing rule, in which case a name is its own species. The option `--show problems` prints only the rows that need attention, which are the names that are not `ok` and the names with a leftover word made only of letters, such as `maritima`. Leftover words with digits, such as `sample1` or `s012`, are usually specimen identifiers and do not count. Neither do the leftover words of a name that a map row resolves, because the row says what the name means.
 
 ```bash
 twig name-map -i trees aln -s species.nwk --show problems
@@ -172,7 +172,7 @@ status ambiguous 1, inferred 1, ok 10, unmapped 1
 Amaranthus_pumilus has up to 2 samples in one tree or FASTA file, which happens in 2 of the 4 where it occurs
 ```
 
-Besides the counts and the names that need attention, the summary names every tree or FASTA file in which a name occurs more than once, which means that the file is broken, and it lists species of the species tree that have no samples, the words that are left over after the species name for each species, and the species that have more than one sample in a single tree or file. The last two help to find a delimiter that splits names too finely or too coarsely, and a subspecies that is lumped into its species.
+Besides the counts and the names that need attention, the summary names every tree or FASTA file in which a name occurs more than once, which means that the file is broken, and it lists species of the species tree that have no samples, the leftover words made only of letters for each species, except in names that a map row resolves, and the species that have more than one sample in a single tree or file. The last two help to find a delimiter that splits names too finely or too coarsely, and a subspecies that is lumped into its species.
 
 ## Parsing names
 
@@ -242,7 +242,7 @@ A_hybridus_s1 Amaranthus_hybridus  # inferred by genus abbreviation, review
 # UNMAPPED Zea_mays_s1 Beta_vulgaris(0.417);Amaranthus_pumilus(0.414);Amaranthus_hybridus(0.4)
 ```
 
-Names with the status `ok` or `inferred` are written. Rows that came from an abbreviation carry a comment as a reminder to review them, and the comment can stay. Ambiguous and unmapped names are listed in comments, and you resolve them by adding a row, for example `A_pumilus_sample1 Amaranthus_pumilus`. The specimen column is written only when a map row or a regex group gave a specimen, because otherwise a reloaded map would make every sample its own specimen and would silently switch off the detection of duplicate samples.
+Names with the status `ok` or `inferred` are written. Rows that came from an abbreviation carry a comment as a reminder to review them, and the comment can stay. Ambiguous and unmapped names are listed in comments, and you resolve them by adding a row, for example `A_pumilus_sample1 Amaranthus_pumilus`. The specimen column is written only when a map row or a regex group gave a specimen, because otherwise a reloaded map would make every sample its own specimen and would silently switch off the detection of duplicate samples. A name that a map row resolves keeps its leftover words, found by matching the name to the species of the row, so a sample has the same leftover and specimen before and after freezing.
 
 Running the same command again with the map file leaves only the names you have not yet resolved.
 
@@ -254,7 +254,7 @@ An existing output file is never overwritten unless you pass `-f`. Even with `-f
 
 ## Strict mode
 
-With `--strict` the tool stops with an error and exit status 1 if any name is unmapped, ambiguous or inferred, or has words left over after the species name, or if a tree or a FASTA file holds a name more than once. The table is still written, so you can see what needs attention, but no map file is frozen. This is useful in a script that should stop before a long analysis starts.
+With `--strict` the tool stops with an error and exit status 1 if any name is unmapped, ambiguous or inferred, or has a leftover word made only of letters as described for `--show problems`, or if a tree or a FASTA file holds a name more than once. The table is still written, so you can see what needs attention, but no map file is frozen. This is useful in a script that should stop before a long analysis starts.
 
 ## Large data sets
 

@@ -31,6 +31,9 @@ from twig.labeling.core.names import NameHit, NameMapper, write_frozen_map, writ
 # how many items of a long list are shown in a log message
 SHOWN = 8
 
+# methods of names resolved by a map row
+MAP_METHODS = ("map", "map-regex")
+
 
 @dataclass
 class Unit:
@@ -108,8 +111,12 @@ def check_outputs(args) -> None:
 
 
 def needs_attention(hit: NameHit) -> bool:
-    """Return True if a name is unresolved, inferred, or has leftover words."""
-    return hit.status != "ok" or any(i.isalpha() for i in hit.leftover)
+    """Return True if a name is unresolved or inferred, or has leftover words made only of letters.
+
+    The leftover words of a name resolved by a map row do not count, because
+    the row says what the name means.
+    """
+    return hit.status != "ok" or (hit.method not in MAP_METHODS and any(i.isalpha() for i in hit.leftover))
 
 
 def summarize(hits: list[NameHit], units: list[Unit], vocabulary: list[str] | None) -> None:
@@ -150,7 +157,7 @@ def summarize(hits: list[NameHit], units: list[Unit], vocabulary: list[str] | No
 
     leftovers: dict[str, Counter] = defaultdict(Counter)
     for hit in hits:
-        if hit.species:
+        if hit.species and hit.method not in MAP_METHODS:
             for token in hit.leftover:
                 if token.isalpha():
                     leftovers[hit.species][token] += 1

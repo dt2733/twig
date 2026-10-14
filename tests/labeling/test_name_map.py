@@ -361,6 +361,9 @@ class TestHelpers:
         assert needs_attention(NameHit("a", "A", None, "abbrev", "inferred"))
         assert needs_attention(NameHit("a", "A", None, "token", "ok", leftover=("maritima", "s1")))
         assert not needs_attention(NameHit("a", "A", None, "token", "ok", leftover=("s1", "g7")))
+        # a map row says what the name means, so its leftover words are not a problem
+        assert not needs_attention(NameHit("a", "A", None, "map", "ok", leftover=("maritima", "s1")))
+        assert not needs_attention(NameHit("a", "A", None, "map-regex", "ok", leftover=("maritima",)))
 
     def test_read_units_requires_names(self, tmp_path):
         empty = tmp_path / "empty"
