@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import TextIO
 
 from twig.utils import TwigError
+from twig.labeling.core.textio import read_text, reading
 
 # characters that mean no data in an alignment column
 GAP_CHARS = "-?."
@@ -46,16 +47,6 @@ STOP_CODONS: dict[int, frozenset[str]] = {
 ###########################################################################
 # reading
 ###########################################################################
-
-def _read_text(path: str | Path) -> str:
-    path = Path(path)
-    try:
-        return path.read_text(encoding="utf-8-sig")       # utf-8-sig drops a byte order mark
-    except OSError as exc:
-        raise TwigError(f"cannot read {path}: {exc}") from exc
-    except UnicodeDecodeError as exc:
-        raise TwigError(f"{path} is not valid UTF-8 text") from exc
-
 
 def parse_fasta(text: str, source: str = "<text>", aligned: bool = False) -> dict[str, str]:
     """Return FASTA records as an ordered dict of {header: sequence}.
@@ -101,7 +92,7 @@ def parse_fasta(text: str, source: str = "<text>", aligned: bool = False) -> dic
 
 def read_fasta(path: str | Path, aligned: bool = False) -> dict[str, str]:
     """Return the records of a FASTA file as an ordered dict {header: sequence}."""
-    return parse_fasta(_read_text(path), source=str(path), aligned=aligned)
+    return parse_fasta(read_text(path, "FASTA file"), source=str(path), aligned=aligned)
 
 
 def read_headers(path: str | Path) -> list[str]:
@@ -113,26 +104,21 @@ def read_headers(path: str | Path) -> list[str]:
     path = Path(path)
     names = []
     empty = None        # the line of the last header, until a sequence follows it
-    try:
-        with open(path, "r", encoding="utf-8-sig") as data:
-            for lineno, line in enumerate(data, start=1):
-                line = line.strip()
-                if not line:
-                    continue
-                if line.startswith(">"):
-                    if empty is not None:
-                        break
-                    fields = line[1:].split()
-                    if not fields:
-                        raise TwigError(f"{path}:{lineno}: empty FASTA header")
-                    names.append(fields[0])
-                    empty = lineno
-                else:
-                    empty = None
-    except OSError as exc:
-        raise TwigError(f"cannot read {path}: {exc}") from exc
-    except UnicodeDecodeError as exc:
-        raise TwigError(f"{path} is not valid UTF-8 text") from exc
+    with reading(path, "FASTA file"), open(path, "r", encoding="utf-8-sig") as data:
+        for lineno, line in enumerate(data, start=1):
+            line = line.strip()
+            if not line:
+                continue
+            if line.startswith(">"):
+                if empty is not None:
+                    break
+                fields = line[1:].split()
+                if not fields:
+                    raise TwigError(f"{path}:{lineno}: empty FASTA header")
+                names.append(fields[0])
+                empty = lineno
+            else:
+                empty = None
     if not names:
         raise TwigError(f"{path}: no FASTA records")
     if empty is not None:

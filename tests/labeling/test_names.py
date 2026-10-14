@@ -43,7 +43,7 @@ class TestReadVocabList:
             read_vocab_list(path)
 
     def test_a_missing_file_is_an_error(self, tmp_path):
-        with pytest.raises(TwigError, match="cannot read species list"):
+        with pytest.raises(TwigError, match="species list .*missing.txt not found"):
             read_vocab_list(tmp_path / "missing.txt")
 
     def test_a_file_that_is_not_text_is_an_error_and_not_a_traceback(self, tmp_path):
@@ -144,7 +144,7 @@ class TestMapFile:
         assert [r.sample for r in rows] == ["s1,a", "^A{1,2}_"]
 
     def test_missing_file(self, tmp_path):
-        with pytest.raises(TwigError, match="cannot read map file"):
+        with pytest.raises(TwigError, match="map file .*missing.tsv not found"):
             parse_map_file(tmp_path / "missing.tsv")
 
     def test_file_that_is_not_text(self, tmp_path):

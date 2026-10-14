@@ -347,7 +347,7 @@ class TestRootEdgesAndRooting:
         for policy in ("outgrup", "Outgroup"):
             code, out, err = run(f"-i {tmp_path / 'nothing.nwk'} -F hyphy --root-edges {policy}")
             assert code == 1 and out == "" and "looks like" in err and "'outgroup'" in err
-            assert "cannot read tree file" not in err and "Traceback" not in err
+            assert "nothing.nwk not found" not in err and "Traceback" not in err
 
     def test_a_policy_label_that_no_branch_has_gives_a_warning(self, run, distinct):
         code, out, err = run(f"-i {distinct} -F hyphy --root-edges Q")
@@ -475,7 +475,7 @@ class TestExistingLabels:
     def test_paml_code_names_are_checked_like_other_label_names(self, run, tmp_path, code, message):
         # 0=unlabel wrote a label named unlabel
         code_, out, err = run(f"-i {tmp_path / 'nothing.nwk'} --paml-codes {code}")
-        assert code_ == 1 and out == "" and message in err and "cannot read tree file" not in err
+        assert code_ == 1 and out == "" and message in err and "nothing.nwk not found" not in err
 
     def test_paml_zero_is_the_background(self, run, tmp_path):
         # #0 was written as the label 0, and -F hyphy stopped because 0 is not a label name
@@ -715,11 +715,11 @@ class TestErrors:
 
     def test_label_names_are_checked_before_any_tree_is_read(self, run, tmp_path):
         code, _, err = run(f"-i {tmp_path / 'nothing.nwk'} -L Test {DIOECIOUS} --stems 9bad")
-        assert code == 1 and "invalid label name" in err and "'9bad'" in err and "cannot read tree file" not in err
+        assert code == 1 and "invalid label name" in err and "'9bad'" in err and "nothing.nwk not found" not in err
 
     def test_missing_input(self, run, tmp_path):
         code, _, err = run(f"-i {tmp_path / 'nothing.nwk'}")
-        assert code == 1 and "cannot read tree file" in err and "Traceback" not in err
+        assert code == 1 and "nothing.nwk not found" in err and "Traceback" not in err
         assert "no label sets were given" not in err
 
     def test_a_byte_order_mark_is_ignored(self, run, tmp_path):

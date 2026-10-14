@@ -52,7 +52,7 @@ class TestExpand:
     def test_errors(self, files):
         with pytest.raises(TwigError, match="no files match"):
             batch.expand_inputs([str(files / "trees" / "*.nope")])
-        with pytest.raises(TwigError, match="input file not found"):
+        with pytest.raises(TwigError, match="input file .*missing.nwk not found"):
             batch.expand_inputs([files / "missing.nwk"])
         (files / "empty").mkdir()
         with pytest.raises(TwigError, match="contains no files"):
@@ -185,7 +185,7 @@ class TestManifest:
 
     @pytest.mark.parametrize("text, message", [
         ("OG1\n", r"expected 2 or 3 columns"),
-        ("OG1 nope.nwk\n", r"file not found: nope.nwk"),
+        ("OG1 nope.nwk\n", r"file nope.nwk not found"),
         ("", r"no manifest rows found"),
     ])
     def test_errors(self, tmp_path, text, message):

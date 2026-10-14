@@ -36,6 +36,7 @@ from loguru import logger
 
 from twig.utils import TwigError
 from twig.labeling.core.constants import HAS_DIST, LABEL, LABEL_SYNTAXES
+from twig.labeling.core.textio import read_text
 
 if TYPE_CHECKING:  # pragma: no cover
     from toytree import ToyTree
@@ -132,16 +133,6 @@ def deep_recursion(tree: "ToyTree"):
 # splitting files into trees
 ###########################################################################
 
-def _read_text(path: str | Path) -> str:
-    path = Path(path)
-    try:
-        return path.read_text(encoding="utf-8-sig")       # utf-8-sig drops a byte order mark
-    except OSError as exc:
-        raise TwigError(f"cannot read tree file {path}: {exc}") from exc
-    except UnicodeDecodeError as exc:
-        raise TwigError(f"tree file {path} is not valid UTF-8 text") from exc
-
-
 def _compact(text: str, source: str, number: int) -> str:
     """Remove whitespace outside [...] comments, and refuse quoted names and names with spaces.
 
@@ -231,7 +222,7 @@ def iter_trees_text(text: str, source: str = "<text>") -> Iterator[tuple[str | N
 
 def iter_trees(path: str | Path) -> Iterator[tuple[str | None, str]]:
     """Yield (locus, newick) for each tree in a file. See `iter_trees_text`."""
-    yield from iter_trees_text(_read_text(path), source=str(path))
+    yield from iter_trees_text(read_text(path, "tree file"), source=str(path))
 
 
 ###########################################################################
@@ -663,7 +654,7 @@ def _single_newick(source: str | Path) -> tuple[str, str]:
     ):
         path = Path(source)
         if not path.is_file():
-            raise TwigError(f"tree file not found: {source}")
+            raise TwigError(f"tree file {source} not found")
         records = list(iter_trees(path))
         where = str(path)
     else:

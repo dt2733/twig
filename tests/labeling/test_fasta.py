@@ -71,7 +71,7 @@ class TestParse:
         empty.write_text("ACGT\n")
         with pytest.raises(TwigError, match="no FASTA records"):
             fasta.read_headers(empty)
-        with pytest.raises(TwigError, match="cannot read"):
+        with pytest.raises(TwigError, match="FASTA file .*missing.fa not found"):
             fasta.read_headers(tmp_path / "missing.fa")
 
 

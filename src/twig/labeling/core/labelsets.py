@@ -38,6 +38,7 @@ from twig.labeling.core.parsimony import to_fraction
 from twig.labeling.core.rules import AMBIGUOUS_MODES, RULES, RuleInput, make_options, resolve_rule
 from twig.labeling.core.sanitize import check_label_names
 from twig.labeling.core.selectors import Selector
+from twig.labeling.core.textio import read_text
 
 NUISANCE_RULE = "all"
 SPEC_OPTIONS = ("ambiguous", "gain-cost", "loss-cost")
@@ -154,12 +155,7 @@ def read_spec(path: str | Path, default_rule: str = "all") -> list[LabelSet]:
     comment line.
     """
     path = Path(path)
-    try:
-        text = path.read_text(encoding="utf-8-sig")       # utf-8-sig drops a byte order mark
-    except OSError as exc:
-        raise TwigError(f"cannot read label spec {path}: {exc}") from exc
-    except UnicodeDecodeError as exc:
-        raise TwigError(f"label spec {path} is not valid UTF-8 text") from exc
+    text = read_text(path, "label spec")
     sets = []
     for lineno, raw in enumerate(text.splitlines(), start=1):
         if not raw.strip() or raw.lstrip().startswith("#"):

@@ -290,7 +290,7 @@ class TestInputs:
     def test_errors(self, run_twig, names_dir, tmp_path):
         sp = f"-s {names_dir}/species.nwk"
         code, _, err = run_twig(f"name-map -i {tmp_path}/missing.nwk {sp}")
-        assert code == 1 and "input file not found" in err
+        assert code == 1 and "missing.nwk not found" in err and "Traceback" not in err
         bad = tmp_path / "bad.nwk"
         bad.write_text("((A,B),C;\n")
         code, _, err = run_twig(f"name-map -i {bad} {sp}")

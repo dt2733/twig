@@ -26,6 +26,7 @@ from typing import Iterable, Iterator, Mapping, Sequence
 
 from twig.utils import TwigError
 from twig.labeling.core.constants import DEFAULT_LOCUS_REGEX
+from twig.labeling.core.textio import read_text, reading
 from twig.labeling.core.treeio import iter_trees
 
 RUN_RECORD = "twig-run.json"
@@ -75,7 +76,7 @@ def expand_inputs(items: Iterable[str | Path]) -> list[Path]:
         elif os.path.isfile(text):
             paths = [Path(text)]
         else:
-            raise TwigError(f"input file not found: {text}")
+            raise TwigError(f"input file {text} not found")
         for path in paths:
             resolved = path.resolve()
             if resolved not in seen:
@@ -98,26 +99,23 @@ def sniff_kind(path: str | Path) -> str:
     skipped.
     """
     header = False
-    try:
-        with open(path, "r", encoding="utf-8-sig", errors="replace") as data:      # utf-8-sig drops a byte order mark
-            for _, line in zip(range(200), data):
-                text = line.strip()
-                if not text:
-                    continue
-                if text.upper().startswith("#NEXUS") and not header:
-                    return "tree"
-                if text.startswith("#") or _COMMENTS_ONLY.match(text):
-                    continue
-                if text.startswith(">") and not header:
-                    return "fasta"
-                if _TREE_START.match(text) or _TREE_WITH_LOCUS.match(line.lstrip()):
-                    return "tree"
-                if _PAML_HEADER.match(text) and not header:
-                    header = True
-                    continue
-                return "unknown"
-    except OSError as exc:
-        raise TwigError(f"cannot read {path}: {exc}") from exc
+    with reading(path, "input file"), open(path, "r", encoding="utf-8-sig", errors="replace") as data:      # utf-8-sig drops a byte order mark
+        for _, line in zip(range(200), data):
+            text = line.strip()
+            if not text:
+                continue
+            if text.upper().startswith("#NEXUS") and not header:
+                return "tree"
+            if text.startswith("#") or _COMMENTS_ONLY.match(text):
+                continue
+            if text.startswith(">") and not header:
+                return "fasta"
+            if _TREE_START.match(text) or _TREE_WITH_LOCUS.match(line.lstrip()):
+                return "tree"
+            if _PAML_HEADER.match(text) and not header:
+                header = True
+                continue
+            return "unknown"
     return "unknown"
 
 
@@ -223,12 +221,7 @@ def read_manifest(path: str | Path) -> list[ManifestRow]:
     relative to the directory of the manifest.
     """
     path = Path(path)
-    try:
-        text = path.read_text(encoding="utf-8-sig")       # utf-8-sig drops a byte order mark
-    except OSError as exc:
-        raise TwigError(f"cannot read manifest {path}: {exc}") from exc
-    except UnicodeDecodeError as exc:
-        raise TwigError(f"manifest {path} is not valid UTF-8 text") from exc
+    text = read_text(path, "manifest")
 
     def locate(value: str, where: str) -> Path:
         candidate = Path(value)
@@ -237,7 +230,7 @@ def read_manifest(path: str | Path) -> list[ManifestRow]:
         beside = path.parent / value
         if beside.is_file():
             return beside
-        raise TwigError(f"{where}: file not found: {value}")
+        raise TwigError(f"{where}: file {value} not found")
 
     rows: list[ManifestRow] = []
     seen: dict[str, int] = {}

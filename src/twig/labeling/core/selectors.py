@@ -19,6 +19,7 @@ from pathlib import Path
 
 from twig.utils import TwigError
 from twig.labeling.core.display import count
+from twig.labeling.core.textio import read_text
 
 
 def _compile(pattern: str, where: str) -> re.Pattern:
@@ -30,13 +31,7 @@ def _compile(pattern: str, where: str) -> re.Pattern:
 
 def read_name_list(path: str | Path) -> tuple[list[str], list[str]]:
     """Return the exact names and the regex patterns listed in a file."""
-    path = Path(path)
-    try:
-        text = path.read_text(encoding="utf-8-sig")       # utf-8-sig drops a byte order mark
-    except OSError as exc:
-        raise TwigError(f"cannot read selector list {path}: {exc}") from exc
-    except UnicodeDecodeError as exc:
-        raise TwigError(f"selector list {path} is not valid UTF-8 text") from exc
+    text = read_text(path, "selector list")
     names, patterns = [], []
     for lineno, raw in enumerate(text.splitlines(), start=1):
         line = raw.strip()

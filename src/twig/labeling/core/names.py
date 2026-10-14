@@ -25,6 +25,7 @@ from typing import Iterable, Mapping, Sequence, TextIO
 from twig.utils import TwigError
 from twig.labeling.core.batch import atomic_write
 from twig.labeling.core.constants import DEFAULT_NORMALIZE, NORMALIZE_STEPS
+from twig.labeling.core.textio import read_text
 
 TABLE_COLUMNS = (
     "name",
@@ -178,12 +179,7 @@ def parse_map_file(path: str | Path) -> list[MapRow]:
     comma-separated and every row would map a name to itself.
     """
     path = Path(path)
-    try:
-        text = path.read_text(encoding="utf-8-sig")       # utf-8-sig drops a byte order mark
-    except OSError as exc:
-        raise TwigError(f"cannot read map file {path}: {exc}") from exc
-    except UnicodeDecodeError as exc:
-        raise TwigError(f"map file {path} is not valid UTF-8 text") from exc
+    text = read_text(path, "map file")
 
     rows: list[MapRow] = []
     first_seen: dict[str, int] = {}
@@ -235,12 +231,7 @@ def read_vocab_list(path: str | Path) -> list[str]:
     word of a line is used.
     """
     path = Path(path)
-    try:
-        text = path.read_text(encoding="utf-8-sig")       # utf-8-sig drops a byte order mark
-    except OSError as exc:
-        raise TwigError(f"cannot read species list {path}: {exc}") from exc
-    except UnicodeDecodeError as exc:
-        raise TwigError(f"species list {path} is not valid UTF-8 text") from exc
+    text = read_text(path, "species list")
     names = [line.split()[0] for line in text.splitlines() if line.strip() and not line.strip().startswith("#")]
     if not names:
         raise TwigError(f"{path}: no species names found")

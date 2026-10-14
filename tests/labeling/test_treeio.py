@@ -67,7 +67,7 @@ class TestIterTrees:
         path = tmp_path / "trees.nwk"
         path.write_text("(A,B);\n(C,D);\n")
         assert [t for _, t in treeio.iter_trees(path)] == ["(A,B);", "(C,D);"]
-        with pytest.raises(TwigError, match="cannot read tree file"):
+        with pytest.raises(TwigError, match="tree file .*missing.nwk not found"):
             list(treeio.iter_trees(tmp_path / "missing.nwk"))
         bad = tmp_path / "bad.nwk"
         bad.write_bytes(b"\xff\xfe(A,B);")
@@ -253,7 +253,7 @@ class TestReadTree:
         path.write_text("(A,B);\n(C,D);\n")
         with pytest.raises(TwigError, match="found 2 trees but expected one"):
             treeio.read_tree(path)
-        with pytest.raises(TwigError, match="tree file not found"):
+        with pytest.raises(TwigError, match="tree file .*missing.nwk not found"):
             treeio.read_tree(tmp_path / "missing.nwk")
         with pytest.raises(TwigError, match="parse"):
             treeio.read_tree("(A,B;")
