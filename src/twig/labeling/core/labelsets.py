@@ -317,11 +317,16 @@ def _find_stems(
     # nuisance species are not traits
     if config.stems != "keep":
         not_traits = {config.background, config.losses} | {item.name for item in sets if item.nuisance}
-        kept = {
+        candidates = {
             idx for idx, number in winner_set.items()
-            if number is None and labels.get(idx) and labels[idx] not in not_traits
-            and not tree[idx].is_leaf() and idx not in stem_label and starts_label(idx)
+            if number is None and labels.get(idx) and labels[idx] not in not_traits and not tree[idx].is_leaf()
         }
+        kept = {idx for idx in candidates if idx not in stem_label and starts_label(idx)}
+        if candidates and len(root.children) > 2:
+            warnings.append(
+                f"the root has {len(root.children)} children, so the tree looks unrooted and the stems of the labels in the input "
+                "tree depend on the position of the root. Give -r with the outgroup to root the tree first"
+            )
         if kept:
             text = clade_text(tree)
             ordered = [node.idx for node in tree.traverse("preorder") if node.idx in kept]
@@ -395,9 +400,11 @@ def apply_label_sets(
             ambiguous=item.ambiguous or config.ambiguous,
             root_state=config.root_state,
         )
-        if item.rule == "fitch" and options.gain_cost != options.loss_cost and len(root.children) > 2:
+        # which tips lie below a branch depends on the root, so every rule but tips needs a rooted tree
+        if item.rule != "tips" and len(root.children) > 2:
             warnings.append(
-                f"label {item.name}: the costs of gain and loss differ and the tree is unrooted, so the result depends on the position of the root"
+                f"label {item.name}: the root has {len(root.children)} children, so the tree looks unrooted and the {item.rule} rule "
+                "gives a result that depends on the position of the root. Give -r with the outgroup to root the tree first"
             )
         out = RULES[item.rule](RuleInput(tree, item.name, chosen, unknown, groups[number], options))
         reports[number].claimed = len(out.labels)

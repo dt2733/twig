@@ -306,6 +306,17 @@ class TestRootEdgesAndRooting:
         assert out == UNROOTED + "\n"
         assert "rooted on O" in err
 
+    def test_an_unrooted_tree_without_r_gives_a_warning_whatever_the_costs(self, run, tmp_path):
+        # with the basal node next to A the stem and the loss came out wrong, and nothing was said
+        tree = tmp_path / "unrooted.nwk"
+        tree.write_text("(A,(B,C),(M1,(O,(M2,(D,E)))));")
+        options = f"-L Test {DIOECIOUS} --rule fitch --stems unlabel --losses Rev --background Reference -F hyphy"
+        code, _, err = run(f"-i {tree} {options}")
+        assert code == 0 and "the root has 3 children, so the tree looks unrooted" in err and "Give -r with the outgroup" in err
+        code, out, err = run(f"-i {tree} -r O {options}")
+        assert code == 0 and "looks unrooted" not in err
+        assert labeled_names(out)["C"] == "Rev"
+
     def test_the_outgroup_policy_uses_the_side_of_the_outgroup_given_with_r(self, run, distinct):
         # here the outgroup is the whole ingroup, so the outgroup side is the branch above it
         _, out, _ = run(f"-i {distinct} -r M1,A,B,C,M2,D,E -F hyphy --root-edges outgroup")

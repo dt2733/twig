@@ -7,7 +7,7 @@ import pytest
 pytest.importorskip("toytree")
 
 from twig.utils import TwigError
-from twig.labeling.core import treeio
+from twig.labeling.core import rooting, treeio
 from twig.labeling.core.labelsets import (
     LabelingConfig,
     LabelSet,
@@ -362,12 +362,36 @@ class TestWarningsAndErrors:
         result = apply_label_sets(tree, [exact("ZZZ", rule="tips")], cfg())
         assert any("choose no tips" in w for w in result.warnings)
 
-    def test_unequal_costs_on_an_unrooted_tree(self):
+    def test_every_rule_but_tips_warns_on_an_unrooted_tree(self):
         unrooted = fresh("((M1,(A,(B,C))),(M2,(D,E)),O);")
         result = apply_label_sets(unrooted, [exact(*DIOECIOUS)], cfg(gain_cost=Fraction(2)))
         assert any("depends on the position of the root" in w for w in result.warnings)
+        # equal costs used to give no warning, although the labels depend on the root as much
         result = apply_label_sets(unrooted, [exact(*DIOECIOUS)], cfg())
+        assert [w for w in result.warnings if "depends on the position of the root" in w and "-r with the outgroup" in w]
+        result = apply_label_sets(unrooted, [exact(*DIOECIOUS, rule="all")], cfg())
+        assert any("the all rule gives a result that depends on the position of the root" in w for w in result.warnings)
+        assert not apply_label_sets(unrooted, [exact(*DIOECIOUS, rule="tips")], cfg()).warnings
+        assert not apply_label_sets(fresh(), [exact(*DIOECIOUS)], cfg()).warnings
+
+    def test_the_labels_of_an_unrooted_tree_depend_on_where_its_basal_node_lies(self):
+        # the same unrooted tree as above, written with the basal node next to A
+        tree = fresh("(A,(B,C),(M1,(O,(M2,(D,E)))));")
+        config = cfg(stems="unlabel", losses="Rev", background="Reference")
+        result = apply_label_sets(tree, [exact(*DIOECIOUS)], config)
+        assert any("Give -r with the outgroup" in w for w in result.warnings)
+        rooted = rooting.reroot(tree, ["O"]).tree
+        result = apply_label_sets(rooted, [exact(*DIOECIOUS)], config)
         assert not result.warnings
+        assert written(rooted, result) == (
+            "(O{Reference},((M2{Reference},(D{Test},E{Test})){Reference},"
+            "(M1{Reference},(A{Test},(B{Test},C{Rev}){Test})){Reference}){Reference});"
+        )
+
+    def test_stems_of_labels_in_an_unrooted_tree_warn_too(self):
+        tree = fresh("((M1,(A{Test},(B{Test},C){Test}){Test}),(M2,(D{Test},E{Test}){Test}),O);")
+        result = apply_label_sets(tree, [], cfg(stems="Stem"))
+        assert any("the stems of the labels in the input tree depend on the position of the root" in w for w in result.warnings)
 
     def test_label_names_are_checked(self):
         with pytest.raises(TwigError, match="invalid label name"):

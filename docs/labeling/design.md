@@ -579,7 +579,7 @@ def sankoff_binary(tree, tip_states, gain=1, loss=1, root_state="free", tie="del
 4. **Uppass** gives the state sets of all most-parsimonious reconstructions. State s is in node v's set exactly when `d[v][s] + up[v][s] == best`.
 5. **One reconstruction** is chosen in preorder, with `deltran` (default) delaying changes toward the tips and `acctran` moving them toward the root.
 6. **Ambiguous nodes** (`--ambiguous deltran|acctran|unlabel|<NAME>`) follow the chosen reconstruction, stay unlabeled, or get their own label.
-7. **Unrooted input.** With unequal costs the result depends on the root position, so twig warns when the root has three or more children.
+7. **Unrooted input.** The result depends on the root position whatever the costs, so twig warns when the root has three or more children (see H.8).
 
 ### Stems, losses and background
 
@@ -1043,6 +1043,7 @@ Recorded on 2026-10-14, when the findings of a review of `tree-label` were fixed
 
 1. **Stems.** A stem is the internal branch on which a trait arose, as in the glossary, and not simply a labeled branch whose parent has another label as G.1 says. With `fitch` it is a branch with a gain (state 1 below state 0), so a child of a root in state 1 is not a stem. With `crown` it is the branch that the rule leaves out at the base of each group, so `--stems NAME` labels it, the background never takes it, and the first crown branch is not a stem. With the other rules G.1 applies, and a labeled child of the root is a stem unless every child of the root carries the same label. The label of `--ambiguous` is not a trait label, so an ambiguous branch is never a stem, and its source is `ambiguous`. A stem never gets the background label, whatever `--stems` says.
 2. **Stems of labels already in the tree.** When `--stems` is unlabel or a name and `--existing keep` is in effect, the labels kept from the input tree take part, with the definition for the rules other than `fitch` and `crown`, so a tree labeled elsewhere (a PAML tree, or the output of `--stems keep`) can be turned into its crown or stem variant. twig cannot tell whether such a label marks a trait or whether its stems were handled before, so every stem found among them is named in a warning, and the labels that the same run gives to the background, to losses and to nuisance species are never taken for traits. With `--stems keep` these labels are left alone as before. `--losses` needs a parsimony reconstruction, so it never acts on labels kept from the input tree.
+3. **Unrooted trees.** G.1 point 7 first said that only unequal costs make the result of `fitch` depend on the root. A branch is labeled by the state of the node below it, so with equal costs too the labels change with the position of the basal node of an unrooted tree, and the same holds for every rule except `tips`, which do not know which tips lie below a branch without a root. When the root has three or more children, every label whose rule is not `tips` gives a warning that names the problem and suggests `-r` with the outgroup, and so does `--stems` on labels kept from the input tree. With `-r` the root has two children and there is no warning.
 
 ---
 
