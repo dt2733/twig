@@ -21,9 +21,8 @@ from dataclasses import dataclass, field
 from fractions import Fraction
 
 from twig.utils import TwigError
+from twig.labeling.core.constants import DEFAULT_AMBIGUOUS, TIE_RULES
 from twig.labeling.core.parsimony import sankoff_binary, to_fraction
-
-AMBIGUOUS_MODES = ("deltran", "acctran", "unlabel")
 
 
 @dataclass(frozen=True)
@@ -36,7 +35,7 @@ class RuleOptions:
     """
     gain_cost: Fraction = Fraction(1)
     loss_cost: Fraction = Fraction(1)
-    ambiguous: str = "acctran"
+    ambiguous: str = DEFAULT_AMBIGUOUS
     root_state: str = "free"
 
 
@@ -205,10 +204,10 @@ def rule_fitch(inp: RuleInput) -> RuleOutput:
         node.idx: None if node.idx in inp.unknown else int(node.idx in inp.selected)
         for node in tips
     }
-    explicit = opts.ambiguous in ("acctran", "deltran")
+    explicit = opts.ambiguous in TIE_RULES
     result = sankoff_binary(
         inp.tree, states, opts.gain_cost, opts.loss_cost, opts.root_state,
-        tie=opts.ambiguous if explicit else "acctran",
+        tie=opts.ambiguous if explicit else DEFAULT_AMBIGUOUS,
     )
 
     # a tip can be ambiguous too, if its state is unknown
@@ -285,6 +284,6 @@ def rule_stem(inp: RuleInput) -> RuleOutput:
     return RuleOutput(labels, direct=frozenset(labels) & inp.selected)
 
 
-def make_options(gain=1, loss=1, ambiguous: str = "acctran", root_state: str = "free") -> RuleOptions:
+def make_options(gain=1, loss=1, ambiguous: str = DEFAULT_AMBIGUOUS, root_state: str = "free") -> RuleOptions:
     """Return RuleOptions from values as they are given on the command line."""
     return RuleOptions(to_fraction(gain), to_fraction(loss), ambiguous, str(root_state))

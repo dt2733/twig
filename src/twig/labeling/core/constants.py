@@ -29,21 +29,6 @@ TREE_LABEL_UNMAPPED = ("error", "ignore")
 # rows printed by name-map
 SHOW_CHOICES = ("all", "problems")
 
-# how a name was resolved, and whether the result can be used
-HIT_METHODS = (
-    "map",
-    "map-regex",
-    "delim",
-    "regex",
-    "exact",
-    "canon",
-    "token",
-    "abbrev",
-    "self",
-    "none",
-)
-HIT_STATUSES = ("ok", "inferred", "ambiguous", "unmapped")
-
 # statuses of gene tree branches after labels are transferred
 STATUS_NAMES = (
     "labeled",
@@ -71,6 +56,11 @@ PRECEDENCE_CHOICES = ("specific", "first", "last", "error")
 EXISTING_CHOICES = ("keep", "clear")
 ROOT_STATE_CHOICES = ("free", "0", "1")
 DEFAULT_NUISANCE_LABEL = "Nuisance"
+
+# how parsimony chooses between equally good histories, and what to do with the branches that differ
+TIE_RULES = ("deltran", "acctran")
+AMBIGUOUS_MODES = TIE_RULES + ("unlabel",)
+DEFAULT_AMBIGUOUS = "acctran"
 
 # output formats of trees with labels, and what to do with the two branches at the root
 FORMAT_NAMES = ("braces", "hyphy", "newick", "table")

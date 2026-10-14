@@ -25,13 +25,7 @@ from loguru import logger
 
 from twig.utils import TwigError, set_log_level
 from twig.labeling.core import batch, display, rooting, treeio, writers
-from twig.labeling.core.constants import (
-    DEFAULT_NORMALIZE,
-    EXISTING_CHOICES,
-    LEAF_NODE_CHOICES,
-    PRECEDENCE_CHOICES,
-    SELECT_ON_CHOICES,
-)
+from twig.labeling.core.constants import DEFAULT_NORMALIZE
 from twig.labeling.core.display import count, shown
 from twig.labeling.core.labelsets import (
     LabelingConfig,
@@ -216,14 +210,6 @@ def build_label_sets(args) -> list[LabelSet]:
 
 def build_config(args) -> LabelingConfig:
     """Return the settings that apply to all label sets from the parsed arguments."""
-    for name, value, choices in (
-        ("--select-on", args.select_on, SELECT_ON_CHOICES),
-        ("--leaf-nodes", args.leaf_nodes, LEAF_NODE_CHOICES),
-        ("--precedence", args.precedence, PRECEDENCE_CHOICES),
-        ("--existing", args.existing, EXISTING_CHOICES),
-    ):
-        if value not in choices:
-            raise TwigError(f"unknown value {value!r} for {name}, choose from {list(choices)}")
     return LabelingConfig(
         select_on=args.select_on,
         exact=args.exact,

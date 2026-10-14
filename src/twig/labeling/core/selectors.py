@@ -18,7 +18,6 @@ from collections.abc import Iterable, Sequence
 from pathlib import Path
 
 from twig.utils import TwigError
-from twig.labeling.core.display import count
 from twig.labeling.core.textio import read_text
 
 
@@ -107,7 +106,3 @@ class Selector:
                 listed = self.pattern_sources[pattern] != "command line"
                 missing.append("~" + pattern if listed else pattern)
         return missing
-
-    def describe(self) -> str:
-        """Return a short description for log messages."""
-        return f"{count(len(self.names), 'name')} and {count(len(self.patterns), 'pattern')} from {', '.join(self.values) or 'nothing'}"

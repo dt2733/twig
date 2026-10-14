@@ -14,6 +14,7 @@ from pathlib import Path
 from textwrap import dedent
 
 from twig.labeling.core.constants import (
+    DEFAULT_AMBIGUOUS,
     DEFAULT_NORMALIZE,
     DEFAULT_NUISANCE_LABEL,
     EXISTING_CHOICES,
@@ -530,7 +531,7 @@ def get_parser_tree_label(parser: ArgumentParser | None = None) -> ArgumentParse
     select.add_argument("-r", "--outgroups", type=str, metavar="str", nargs="+", help="root the tree on an outgroup first, which every rule except tips needs when the tree is unrooted. Give tips (or species), joined by commas for a clade, and the first outgroup that forms one side of a branch is used")
 
     pars = parser.add_argument_group("Parsimony")
-    pars.add_argument("--ambiguous", type=str, metavar="str", default="acctran", help="two histories can be equally good. acctran puts the changes nearer the root, deltran nearer the tips, unlabel leaves the branches that differ without a label, and a label name gives them a label of their own [%(default)s]")
+    pars.add_argument("--ambiguous", type=str, metavar="str", default=DEFAULT_AMBIGUOUS, help="two histories can be equally good. acctran puts the changes nearer the root, deltran nearer the tips, unlabel leaves the branches that differ without a label, and a label name gives them a label of their own [%(default)s]")
     pars.add_argument("--gain-cost", type=str, metavar="float", default="1", help="how costly it is to gain the trait, compared with losing it. A higher cost makes parsimony avoid gains [%(default)s]")
     pars.add_argument("--loss-cost", type=str, metavar="float", default="1", help="how costly it is to lose the trait, compared with gaining it. A higher cost makes parsimony avoid losses [%(default)s]")
     pars.add_argument("--unknown", type=str, metavar="str", nargs="+", help="tips whose state is not known, so that parsimony may give them either state")

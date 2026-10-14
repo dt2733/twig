@@ -238,3 +238,20 @@ class TestConstants:
                 "import pytest\nwith pytest.raises(AttributeError): core.nothing")
         result = run_python(code)
         assert result.returncode == 0, result.stderr
+
+    def test_the_tie_rules_have_one_definition(self):
+        import inspect
+        from twig.labeling.core import labelsets, parsimony, rules
+        assert constants.AMBIGUOUS_MODES == constants.TIE_RULES + ("unlabel",)
+        defaults = {
+            "parser": parsers.get_parser_tree_label().get_default("ambiguous"),
+            "config": labelsets.LabelingConfig().ambiguous,
+            "rule options": rules.RuleOptions().ambiguous,
+            "make_options": rules.make_options().ambiguous,
+            "parsimony": inspect.signature(parsimony.sankoff_binary).parameters["tie"].default,
+        }
+        assert set(defaults.values()) == {constants.DEFAULT_AMBIGUOUS}, defaults
+        assert parsimony.TIE_RULES == constants.TIE_RULES and rules.TIE_RULES == constants.TIE_RULES
+
+    def test_the_constants_that_nothing_used_are_gone(self):
+        assert not hasattr(constants, "HIT_METHODS") and not hasattr(constants, "HIT_STATUSES")

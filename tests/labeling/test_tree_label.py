@@ -788,6 +788,24 @@ class TestErrors:
         assert set(labeled_names(out)) == {"A", "C"}
 
 
+class TestChoices:
+    """The parser enforces every option with a fixed set of choices, so run_tree_label does not check them again."""
+
+    @pytest.mark.parametrize("bad", [
+        "-F fasta", "--select-on tip", "--leaf-nodes drop", "--precedence some", "--existing erase",
+        "--root-state 2", "--internal-names all", "-U skip",
+    ])
+    def test_a_choice_that_does_not_exist_is_refused_by_the_parser(self, run, bad):
+        with pytest.raises(SystemExit) as info:
+            run(f"-i {NAMED} {bad}")
+        assert info.value.code == 2
+
+    def test_every_choice_that_exists_is_accepted(self, run):
+        for good in ("-F newick", "--select-on name", "--leaf-nodes label", "--precedence last", "--existing clear", "--root-state 1", "--internal-names auto", "-U ignore"):
+            code, _, err = run(f"-i {NAMED} {good}")
+            assert code == 0, (good, err)
+
+
 class TestDeepTrees:
     def test_a_deep_tree_is_labeled_and_written(self, run, tmp_path):
         text = "T0:1"

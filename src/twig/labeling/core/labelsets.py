@@ -32,10 +32,10 @@ from fractions import Fraction
 from pathlib import Path
 
 from twig.utils import TwigError
-from twig.labeling.core.constants import DEFAULT_NUISANCE_LABEL, PRECEDENCE_CHOICES
+from twig.labeling.core.constants import AMBIGUOUS_MODES, DEFAULT_AMBIGUOUS, DEFAULT_NUISANCE_LABEL, PRECEDENCE_CHOICES
 from twig.labeling.core.display import clade_text, count
 from twig.labeling.core.parsimony import to_fraction
-from twig.labeling.core.rules import AMBIGUOUS_MODES, RULES, RuleInput, make_options, resolve_rule
+from twig.labeling.core.rules import RULES, RuleInput, make_options, resolve_rule
 from twig.labeling.core.sanitize import check_label_names
 from twig.labeling.core.selectors import Selector
 from twig.labeling.core.textio import read_text
@@ -74,7 +74,7 @@ class LabelingConfig:
     precedence: str = "specific"
     existing: str = "keep"
     unknown: tuple[str, ...] = ()
-    ambiguous: str = "acctran"
+    ambiguous: str = DEFAULT_AMBIGUOUS
     gain_cost: Fraction = Fraction(1)
     loss_cost: Fraction = Fraction(1)
     root_state: str = "free"

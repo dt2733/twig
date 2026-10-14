@@ -29,8 +29,8 @@ from dataclasses import dataclass
 from fractions import Fraction
 
 from twig.utils import TwigError
+from twig.labeling.core.constants import DEFAULT_AMBIGUOUS, TIE_RULES
 
-TIES = ("deltran", "acctran")
 
 
 @dataclass
@@ -70,7 +70,7 @@ def sankoff_binary(
     gain=1,
     loss=1,
     root_state: str | int = "free",
-    tie: str = "acctran",
+    tie: str = DEFAULT_AMBIGUOUS,
 ) -> ParsimonyResult:
     """Reconstruct a binary trait on a tree with parsimony.
 
@@ -93,8 +93,8 @@ def sankoff_binary(
         `acctran` changes at once, which moves changes toward the root and
         favors a single gain followed by a loss.
     """
-    if tie not in TIES:
-        raise TwigError(f"unknown tie rule {tie!r}, choose from {list(TIES)}")
+    if tie not in TIE_RULES:
+        raise TwigError(f"unknown tie rule {tie!r}, choose from {list(TIE_RULES)}")
     if str(root_state) not in ("free", "0", "1"):
         raise TwigError(f"root state must be free, 0 or 1, got {root_state!r}")
     cost = ((Fraction(0), to_fraction(gain)), (to_fraction(loss), Fraction(0)))

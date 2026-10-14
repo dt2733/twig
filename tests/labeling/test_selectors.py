@@ -67,5 +67,3 @@ class TestSelector:
         # a value that is not an existing file is a pattern, so a typo in a path is not an error
         assert Selector([str(tmp_path / "missing.txt")]).select(NAMES) == []
 
-    def test_describe(self):
-        assert Selector(["^A"]).describe() == "0 names and 1 pattern from ^A"

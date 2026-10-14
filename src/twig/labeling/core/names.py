@@ -296,11 +296,11 @@ class Vocabulary:
 
         hits = self._token_hits(parts)
         if hits:
-            return "token", *self._best(hits, parts)
+            return "token", *self._best(hits)
 
         hits = self._abbrev_hits(parts)
         if hits:
-            return "abbrev", *self._best(hits, parts)
+            return "abbrev", *self._best(hits)
         return "none", [], ()
 
     def _token_hits(self, parts: tuple[str, ...]) -> list[tuple[int, str, int, tuple[str, ...]]]:
@@ -326,7 +326,7 @@ class Vocabulary:
         return hits
 
     @staticmethod
-    def _best(hits: list[tuple[int, str, int, tuple[str, ...]]], parts: tuple[str, ...]) -> tuple[list[str], tuple[str, ...]]:
+    def _best(hits: list[tuple[int, str, int, tuple[str, ...]]]) -> tuple[list[str], tuple[str, ...]]:
         """Return the species covering the most tokens, and the tokens used."""
         longest = max(i[0] for i in hits)
         best = [i for i in hits if i[0] == longest]
